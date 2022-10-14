@@ -18,8 +18,8 @@ using namespace cv;
 
 #define PI 3.14159265359
 
-void Util::LoadInputData(const std::string &strImageFolder, const std::string &strPoseFolder, const std::string &strAltitudeFolder, const std::string &strGroundRangeFolder,
-                         std::vector<cv::Mat> &vmImgs, std::vector<cv::Mat> &vmPoses, std::vector<std::vector<double>> &vvAltts, std::vector<std::vector<double>> &vvGranges)
+void Util::LoadInputData(const std::string &strImageFolder, const std::string &strPoseFolder, const std::string &strAltitudeFolder, const std::string &strGroundRangeFolder, const std::string &strAnnotationFolder,
+                         std::vector<cv::Mat> &vmImgs, std::vector<cv::Mat> &vmPoses, std::vector<std::vector<double>> &vvAltts, std::vector<std::vector<double>> &vvGranges, std::vector<cv::Mat> &vmAnnos)
 {
     // get data paths, ordered by name
     boost::filesystem::path path_img(strImageFolder);
@@ -49,6 +49,13 @@ void Util::LoadInputData(const std::string &strImageFolder, const std::string &s
           , boost::filesystem::directory_iterator{}
         );
     std::sort(path_groundrange_ordered.begin(), path_groundrange_ordered.end());
+
+    boost::filesystem::path path_annotation(strAnnotationFolder);
+    std::vector<boost::filesystem::path> path_annotation_ordered(
+          boost::filesystem::directory_iterator(path_annotation)
+          , boost::filesystem::directory_iterator{}
+        );
+    std::sort(path_annotation_ordered.begin(), path_annotation_ordered.end());
 
 
     // get input sss images
@@ -153,6 +160,29 @@ void Util::LoadInputData(const std::string &strImageFolder, const std::string &s
       // for (double x : vGrange)
       //   cout << x << " ";
       // cout << endl;
+    }
+
+    // get input annotations of images
+    for(auto const& path : path_annotation_ordered)
+    {
+    //   std::cout << path << '\n';
+
+      cv::Mat anno_tmp;
+      cv::FileStorage fs(path.string(),cv::FileStorage::READ);
+      fs["anno_kps"] >> anno_tmp;
+      fs.release();
+      vmAnnos.push_back(anno_tmp);
+      cout << "annotation size: "<< anno_tmp.rows << " " << anno_tmp.cols << endl;
+      // cout.precision(10);
+      // for (int i = 0; i < 100; i++)
+      // {
+      //     for (int j = 0; j < 100; j++)
+      //     {
+      //       cout << img_tmp.at<double>(i,j) << " ";
+      //     }
+      //     cout << endl;
+      // }
+
     }
 
     return;                   
@@ -300,144 +330,144 @@ cv::Mat Util::NormalizeConvertSSS(Eigen::MatrixXd &sss_wf_img)
     return output_img;
 }
 
-pcl::PointCloud<pcl::PointXYZI>::Ptr Util::ImgMosaicOld(std::vector<cv::Mat> &coords, cv::Mat &img)
-{
+// pcl::PointCloud<pcl::PointXYZI>::Ptr Util::ImgMosaicOld(std::vector<cv::Mat> &coords, cv::Mat &img)
+// {
     
-    // --- process the intensity image --- //
-    Eigen::MatrixXd img_norm, img_clip;
-    cv::cv2eigen(img, img_norm);
-    // normalize by column
-    for (int i = 0; i < img_norm.cols(); i++)
-        img_norm.col(i) = img_norm.col(i)/img_norm.col(i).mean();
-    // clip to (l,u)
-    float l = 0, u = 3;
-    img_clip = Eigen::MatrixXd::Zero(img_norm.rows(),img_norm.cols());
-    for (size_t i = 0; i < img_norm.rows(); i++)
-    {
-        for (size_t j = 0; j < img_norm.cols(); j++)
-        {
-            if (img_norm(i,j)<l)
-                img_clip(i,j) = l;
-            else if (img_norm(i,j)>u)
-                img_clip(i,j) = u;  
-            else
-                img_clip(i,j) = img_norm(i,j);
-        }    
-    }
+//     // --- process the intensity image --- //
+//     Eigen::MatrixXd img_norm, img_clip;
+//     cv::cv2eigen(img, img_norm);
+//     // normalize by column
+//     for (int i = 0; i < img_norm.cols(); i++)
+//         img_norm.col(i) = img_norm.col(i)/img_norm.col(i).mean();
+//     // clip to (l,u)
+//     float l = 0, u = 3;
+//     img_clip = Eigen::MatrixXd::Zero(img_norm.rows(),img_norm.cols());
+//     for (size_t i = 0; i < img_norm.rows(); i++)
+//     {
+//         for (size_t j = 0; j < img_norm.cols(); j++)
+//         {
+//             if (img_norm(i,j)<l)
+//                 img_clip(i,j) = l;
+//             else if (img_norm(i,j)>u)
+//                 img_clip(i,j) = u;  
+//             else
+//                 img_clip(i,j) = img_norm(i,j);
+//         }    
+//     }
 
-    // --- fill cloud --- //
-    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>());
-    int row = coords[0].rows, col = coords[0].cols;
-    for (int i=0;i<row;i++)
-    {
-        for (int j=0;j<col;j++)
-        {
-            pcl::PointXYZI point;
-            point.x = coords[0].at<double>(i,j);
-            point.y = coords[1].at<double>(i,j);
-            point.z = coords[2].at<double>(i,j);
-            point.intensity = img_clip(i,j);
+//     // --- fill cloud --- //
+//     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>());
+//     int row = coords[0].rows, col = coords[0].cols;
+//     for (int i=0;i<row;i++)
+//     {
+//         for (int j=0;j<col;j++)
+//         {
+//             pcl::PointXYZI point;
+//             point.x = coords[0].at<double>(i,j);
+//             point.y = coords[1].at<double>(i,j);
+//             point.z = coords[2].at<double>(i,j);
+//             point.intensity = img_clip(i,j);
 
-            cloud->points.push_back(point);
-        }
-    }   
+//             cloud->points.push_back(point);
+//         }
+//     }   
 
-    return cloud;
-}
+//     return cloud;
+// }
 
-pcl::PointCloud<pcl::PointXYZI>::Ptr Util::ImgMosaic(cv::Mat &img, cv::Mat &pose, std::vector<double> &g_range)
-{
+// pcl::PointCloud<pcl::PointXYZI>::Ptr Util::ImgMosaic(cv::Mat &img, cv::Mat &pose, std::vector<double> &g_range)
+// {
 
-    // (1) --- process the intensity image --- //
+//     // (1) --- process the intensity image --- //
 
-    Eigen::MatrixXd img_norm, img_clip;
-    cv::cv2eigen(img, img_norm);
-    // normalize by column
-    for (int i = 0; i < img_norm.cols(); i++)
-        img_norm.col(i) = img_norm.col(i)/img_norm.col(i).mean();
-    // clip to (l,u)
-    float l = 0, u = 3;
-    img_clip = Eigen::MatrixXd::Zero(img_norm.rows(),img_norm.cols());
-    for (size_t i = 0; i < img_norm.rows(); i++)
-    {
-        for (size_t j = 0; j < img_norm.cols(); j++)
-        {
-            if (img_norm(i,j)<l)
-                img_clip(i,j) = l;
-            else if (img_norm(i,j)>u)
-                img_clip(i,j) = u;  
-            else
-                img_clip(i,j) = img_norm(i,j);
-        }    
-    }
-    // rescale to (rs_l,rs_u)
-    float rs_l = 0, rs_u = 255;
-    float min = img_clip.minCoeff();
-    float max = img_clip.maxCoeff();
-    img_clip = rs_l + (img_clip.array() - min) * ((rs_u - rs_l) / (max - min));
+//     Eigen::MatrixXd img_norm, img_clip;
+//     cv::cv2eigen(img, img_norm);
+//     // normalize by column
+//     for (int i = 0; i < img_norm.cols(); i++)
+//         img_norm.col(i) = img_norm.col(i)/img_norm.col(i).mean();
+//     // clip to (l,u)
+//     float l = 0, u = 3;
+//     img_clip = Eigen::MatrixXd::Zero(img_norm.rows(),img_norm.cols());
+//     for (size_t i = 0; i < img_norm.rows(); i++)
+//     {
+//         for (size_t j = 0; j < img_norm.cols(); j++)
+//         {
+//             if (img_norm(i,j)<l)
+//                 img_clip(i,j) = l;
+//             else if (img_norm(i,j)>u)
+//                 img_clip(i,j) = u;  
+//             else
+//                 img_clip(i,j) = img_norm(i,j);
+//         }    
+//     }
+//     // rescale to (rs_l,rs_u)
+//     float rs_l = 0, rs_u = 255;
+//     float min = img_clip.minCoeff();
+//     float max = img_clip.maxCoeff();
+//     img_clip = rs_l + (img_clip.array() - min) * ((rs_u - rs_l) / (max - min));
 
 
-    // (2) --- get geo-referenced location of the image --- //
+//     // (2) --- get geo-referenced location of the image --- //
 
-    // get bin locations of image
-    cv::Mat bin_loc_x = cv::Mat::zeros(img.size(), CV_64FC1);
-    cv::Mat bin_loc_y = cv::Mat::zeros(img.size(), CV_64FC1);
-    cv::Mat bin_loc_z = cv::Mat::zeros(img.size(), CV_64FC1);
+//     // get bin locations of image
+//     cv::Mat bin_loc_x = cv::Mat::zeros(img.size(), CV_64FC1);
+//     cv::Mat bin_loc_y = cv::Mat::zeros(img.size(), CV_64FC1);
+//     cv::Mat bin_loc_z = cv::Mat::zeros(img.size(), CV_64FC1);
 
-    for (int i = 0; i < img.rows; i++)
-    {
-        int count  = 0; // for indexing ground range
+//     for (int i = 0; i < img.rows; i++)
+//     {
+//         int count  = 0; // for indexing ground range
 
-        // first, fill the starboard side
-        for (int j = img.cols/2; j < img.cols; j++)
-        {
-            bin_loc_x.at<double>(i,j) = pose.at<double>(i,3) + g_range[count]*cos(pose.at<double>(i,2)+PI/2);
-            bin_loc_y.at<double>(i,j) = pose.at<double>(i,4) + g_range[count]*sin(pose.at<double>(i,2)+PI/2);
-            count++;
-        }
-        // then the port side
-        for (int j = 0; j < img.cols/2; j++)
-        {
-            bin_loc_x.at<double>(i,j) = pose.at<double>(i,3) + g_range[count]*cos(pose.at<double>(i,2)-PI/2);
-            bin_loc_y.at<double>(i,j) = pose.at<double>(i,4) + g_range[count]*sin(pose.at<double>(i,2)-PI/2);
-            count--;
-        }
-    }
+//         // first, fill the starboard side
+//         for (int j = img.cols/2; j < img.cols; j++)
+//         {
+//             bin_loc_x.at<double>(i,j) = pose.at<double>(i,3) + g_range[count]*cos(pose.at<double>(i,2)+PI/2);
+//             bin_loc_y.at<double>(i,j) = pose.at<double>(i,4) + g_range[count]*sin(pose.at<double>(i,2)+PI/2);
+//             count++;
+//         }
+//         // then the port side
+//         for (int j = 0; j < img.cols/2; j++)
+//         {
+//             bin_loc_x.at<double>(i,j) = pose.at<double>(i,3) + g_range[count]*cos(pose.at<double>(i,2)-PI/2);
+//             bin_loc_y.at<double>(i,j) = pose.at<double>(i,4) + g_range[count]*sin(pose.at<double>(i,2)-PI/2);
+//             count--;
+//         }
+//     }
 
-    // (3) --- fill cloud --- //
-    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>());
-    int row = bin_loc_x.rows, col = bin_loc_x.cols;
-    for (int i=0;i<row;i++)
-    {
-        for (int j=0;j<col;j++)
-        {
-            pcl::PointXYZI point;
+//     // (3) --- fill cloud --- //
+//     pcl::PointCloud<pcl::PointXYZI>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZI>());
+//     int row = bin_loc_x.rows, col = bin_loc_x.cols;
+//     for (int i=0;i<row;i++)
+//     {
+//         for (int j=0;j<col;j++)
+//         {
+//             pcl::PointXYZI point;
 
-            point.x = bin_loc_x.at<double>(i,j);
-            point.y = bin_loc_y.at<double>(i,j);
-            point.z = bin_loc_z.at<double>(i,j);
-            // point.z = img_clip(i,j);
+//             point.x = bin_loc_x.at<double>(i,j);
+//             point.y = bin_loc_y.at<double>(i,j);
+//             point.z = bin_loc_z.at<double>(i,j);
+//             // point.z = img_clip(i,j);
 
-            point.intensity = img_clip(i,j);
+//             point.intensity = img_clip(i,j);
 
-            cloud->points.push_back(point);
-        }
-    }
+//             cloud->points.push_back(point);
+//         }
+//     }
 
-    // // draw 3d point cloud (old method)
-    // viz::Viz3d window;
-    // window.showWidget("points", viz::WCloud(mMosa_1, viz::Color::white()));
-    // window.spin();
+//     // // draw 3d point cloud (old method)
+//     // viz::Viz3d window;
+//     // window.showWidget("points", viz::WCloud(mMosa_1, viz::Color::white()));
+//     // window.spin();
 
-    // pcl::PointCloud<pcl::PointXYZI>::Ptr mosa = Util::ImgMosaicOld(vm3ds, vmImgs[0]);
-    // pcl::visualization::CloudViewer viewer ("Side-scan Image Mosaicking Result");
-    // viewer.showCloud (mosa);
-    // viewer.addCoordinateSystem (1.0);
-    // while (!viewer.wasStopped ())
-    // {
-    // }   
+//     // pcl::PointCloud<pcl::PointXYZI>::Ptr mosa = Util::ImgMosaicOld(vm3ds, vmImgs[0]);
+//     // pcl::visualization::CloudViewer viewer ("Side-scan Image Mosaicking Result");
+//     // viewer.showCloud (mosa);
+//     // viewer.addCoordinateSystem (1.0);
+//     // while (!viewer.wasStopped ())
+//     // {
+//     // }   
 
-    return cloud;
-}
+//     return cloud;
+// }
 
 } // namespace Diasss

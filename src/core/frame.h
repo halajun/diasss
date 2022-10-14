@@ -5,6 +5,8 @@
 #include <Eigen/Dense>
 #include <opencv2/opencv.hpp>
 
+#include "ORBextractor.h"
+
 namespace Diasss
 {
 

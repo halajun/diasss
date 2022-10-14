@@ -2,24 +2,16 @@
 #include <boost/filesystem.hpp>
 #include <fstream>
 #include <iostream>
-#include <boost/thread.hpp>
 
 #include "util.h"
 #include "frame.h"
+#include "FEAmatcher.h"
 #include "cxxopts.hpp"
-
-// #include <data_tools/std_data.h>
-// #include <bathy_maps/sss_meas_data.h>
-// #include <cereal/archives/json.hpp>
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/features2d.hpp>
 #include <opencv2/opencv.hpp>
-// #include "opencv2/imgproc/imgproc.hpp"
-
-// #include <pcl/visualization/cloud_viewer.h>
-// #include <pcl/visualization/pcl_visualizer.h>
 
 #include <Eigen/Dense>
 
@@ -31,7 +23,7 @@ using namespace Diasss;
 
 int main(int argc, char** argv)
 {
-  std::string strImageFolder, strPoseFolder, strAltitudeFolder, strGroundRangeFolder;
+  std::string strImageFolder, strPoseFolder, strAltitudeFolder, strGroundRangeFolder, strAnnotationFolder;
 
   // --- read input data paths --- //
   {
@@ -41,7 +33,8 @@ int main(int argc, char** argv)
         ("image", "Input folder containing sss image files", cxxopts::value(strImageFolder))
         ("pose", "Input folder containing auv pose files", cxxopts::value(strPoseFolder))
         ("altitude", "Input folder containing auv altitude files", cxxopts::value(strAltitudeFolder))
-        ("groundrange", "Input folder containing ground range files", cxxopts::value(strGroundRangeFolder));
+        ("groundrange", "Input folder containing ground range files", cxxopts::value(strGroundRangeFolder))
+        ("annotation", "Input folder containing annotation files", cxxopts::value(strAnnotationFolder));
 
     auto result = options.parse(argc, argv);
     if (result.count("help")) {
@@ -64,6 +57,10 @@ int main(int argc, char** argv)
       cout << "Please provide folder containing ground range files..." << endl;
       exit(0);
     }
+    if (result.count("annotation") == 0) {
+      cout << "Please provide folder containing annotation files..." << endl;
+      exit(0);
+    }
   }
 
   // --- parse input data --- //
@@ -71,18 +68,22 @@ int main(int argc, char** argv)
   std::vector<cv::Mat> vmPoses;
   std::vector<std::vector<double>> vvAltts;
   std::vector<std::vector<double>> vvGranges;
-  Util::LoadInputData(strImageFolder,strPoseFolder,strAltitudeFolder,strGroundRangeFolder,vmImgs,vmPoses,vvAltts,vvGranges);
+  std::vector<cv::Mat> vmAnnos;
+  Util::LoadInputData(strImageFolder,strPoseFolder,strAltitudeFolder,strGroundRangeFolder,strAnnotationFolder,
+                      vmImgs,vmPoses,vvAltts,vvGranges,vmAnnos);
 
   int f1 = 0, f2 = 1;
   Frame frame0 = Frame(f1,vmImgs[f1],vmPoses[f1],vvAltts[f1],vvGranges[f1]);
   Frame frame1 = Frame(f2,vmImgs[f2],vmPoses[f2],vvAltts[f2],vvGranges[f2]);
 
-  cv::Mat outimg_1, outimg_2;
-  cv::drawKeypoints(frame0.norm_img, frame0.kps, outimg_1, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
-  cv::imshow("Detected Features 1",outimg_1);
-  cv::drawKeypoints(frame1.norm_img, frame1.kps, outimg_2, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
-  cv::imshow("Detected Features 2",outimg_2);
-  cv::waitKey(0); 
+  std::vector<pair<size_t, size_t> > vkpCorres = FEAmatcher::RobustMatching(frame0,frame1);
+
+  // cv::Mat outimg_1, outimg_2;
+  // cv::drawKeypoints(frame0.norm_img, frame0.kps, outimg_1, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
+  // cv::imshow("Detected Features 1",outimg_1);
+  // cv::drawKeypoints(frame1.norm_img, frame1.kps, outimg_2, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
+  // cv::imshow("Detected Features 2",outimg_2);
+  // cv::waitKey(0); 
 
   // cv::Mat flt_mask = Util::GetFilterMask(vmImgs[0]);
   // cv::Mat img_1 = Util::NormalizeSSS(vmImgs[0]);

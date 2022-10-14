@@ -102,3 +102,16 @@ test_data/pose/ssh-173-pose.txt
 test_data/pose/ssh-174-pose.txt
 build/.cmake/api/v1/reply/index-2022-10-07T12-48-50-0865.json
 build/.cmake/api/v1/reply/index-2022-10-07T15-15-16-0928.json
+build/.cmake/api/v1/reply/cache-v2-d8f51a16195412c8a2e5.json
+build/.cmake/api/v1/reply/cmakeFiles-v1-63e79c28d656ddb13de8.json
+build/.cmake/api/v1/reply/codemodel-v2-a40d916989366fc58c33.json
+build/.cmake/api/v1/reply/index-2022-10-10T12-32-07-0905.json
+build/.cmake/api/v1/reply/target-diasss-b272b71c06f00c90e738.json
+build/.cmake/api/v1/reply/target-test_demo-497a1bcd0f0ef35c7ebd.json
+build/CMakeFiles/diasss.dir/src/core/FEAmatcher.cpp.o
+build/CMakeFiles/diasss.dir/thirdparty/ORBextractor.cpp.o
+test_data/annos-xml/SSH-0170.xml
+test_data/annos-xml/SSH-0171.xml
+test_data/annos-xml/SSH-0172.xml
+test_data/annos-xml/SSH-0173.xml
+test_data/annos-xml/SSH-0174.xml

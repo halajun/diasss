@@ -66,7 +66,7 @@ cv::Mat Frame::GetNormalizeSSS(const cv::Mat &sss_raw_img)
 cv::Mat Frame::GetFilteredMask(const cv::Mat &sss_raw_img)
 {
     float factor = 2.5;
-    int width = 10, r = 6, side = 99;
+    int width = 10, r = 6, side = 150;
 
     cv::Mat output_mask(sss_raw_img.size(), CV_8UC1, Scalar(255));
 
@@ -89,6 +89,9 @@ cv::Mat Frame::GetFilteredMask(const cv::Mat &sss_raw_img)
                 output_mask.at<bool>(i,j) = 0;
             // remove the first and last turning pings
             if (i<side || i>output_mask.rows-side)
+                output_mask.at<bool>(i,j) = 0;
+            // remove the left and right side columns
+            if (j<side*0.6 || j>output_mask.cols-side*0.6)
                 output_mask.at<bool>(i,j) = 0;
         }
 
@@ -150,11 +153,30 @@ void Frame::DetectFeature(const cv::Mat &img, const cv::Mat &mask, std::vector<c
     // cv::Ptr<SiftDescriptorExtractor> descriptor = SiftDescriptorExtractor::create();
     // cv::Ptr<FeatureDetector> detector = cv::ORB::create(1000);
     // cv::Ptr<DescriptorExtractor> descriptor = cv::ORB::create();
-    cv::Ptr<FeatureDetector> detector = cv::ORB::create(500);
-    cv::Ptr<SiftDescriptorExtractor> descriptor = SiftDescriptorExtractor::create();
-    detector->detect(img,kps,mask);
-    descriptor->compute(img, kps, dst);
+    // cv::Ptr<FeatureDetector> detector = cv::ORB::create(500);
+    // cv::Ptr<SiftDescriptorExtractor> descriptor = SiftDescriptorExtractor::create();
+    // detector->detect(img,kps,mask);
+    // descriptor->compute(img, kps, dst);
 
+    std::vector<cv::KeyPoint> keypoints;
+    cv::Mat descriptors;
+    // cv::Mat descriptors = cv::Mat(0, 32, CV_8U);
+    ORB_SLAM2::ORBextractor orb = ORB_SLAM2::ORBextractor(2000, 1.2, 6, 12, 7);
+    orb(img, cv::Mat(), keypoints, descriptors);
+
+    // mask out non-interested area
+    for (size_t i = 0; i < keypoints.size(); i++)
+    {
+        const int v = keypoints[i].pt.y;
+        const int u = keypoints[i].pt.x;
+        if (mask.at<bool>(v,u) == 1)
+        {
+            kps.push_back(keypoints[i]);
+            dst.push_back(descriptors.row(i));
+        }
+        
+    }
+    
     // cv::Mat outimg;
     // cv::drawKeypoints(img, kps, outimg, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
     // cv::imshow("Detected Features",outimg);
