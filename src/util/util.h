@@ -2,8 +2,15 @@
 #ifndef UTIL_H
 #define UTIL_H
 
+#include<iostream>
+#include <boost/filesystem.hpp>
+
 #include <Eigen/Dense>
+#include <Eigen/Core>
 #include <opencv2/core/eigen.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/opencv.hpp>
 
 // #include <pcl/visualization/cloud_viewer.h>
 
@@ -21,6 +28,8 @@ namespace Diasss
 
         static cv::Mat NormalizeSSS(cv::Mat &sss_raw_img);
         static cv::Mat NormalizeConvertSSS(Eigen::MatrixXd &sss_wf_img);
+
+        static void ShowAnnos(int &f1, int &f2, cv::Mat &img1, cv::Mat &img2, const cv::Mat &anno1, const cv::Mat &anno2);
 
         // static pcl::PointCloud<pcl::PointXYZI>::Ptr ImgMosaicOld(std::vector<cv::Mat> &coords, cv::Mat &img);
         // static pcl::PointCloud<pcl::PointXYZI>::Ptr ImgMosaic(cv::Mat &img, cv::Mat &pose, std::vector<double> &g_range);

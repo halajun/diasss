@@ -1,13 +1,5 @@
-#include<iostream>
-#include <boost/filesystem.hpp>
 
 #include "util.h"
-
-#include <Eigen/Dense>
-#include <Eigen/Core>
-#include <opencv2/core/eigen.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/core.hpp>
 
 
 namespace Diasss
@@ -186,6 +178,50 @@ void Util::LoadInputData(const std::string &strImageFolder, const std::string &s
     }
 
     return;                   
+}
+
+void Util::ShowAnnos(int &f1, int &f2, cv::Mat &img1, cv::Mat &img2, const cv::Mat &anno1, const cv::Mat &anno2)
+{
+
+    // --- load annotated keypoints --- //
+    std::vector<cv::KeyPoint> PreKeys, CurKeys;
+    std::vector<cv::DMatch> TemperalMatches;
+    int count = 0;
+    // --- from img1 to img2 ....... //
+    for (size_t i = 0; i < anno1.rows; i++)
+    {
+        if (anno1.at<int>(i,1)==f2 && i%15==0)
+        {
+            PreKeys.push_back(cv::KeyPoint(anno1.at<int>(i,3),anno1.at<int>(i,2),0,0,0,-1));
+            CurKeys.push_back(cv::KeyPoint(anno1.at<int>(i,5),anno1.at<int>(i,4),0,0,0,-1));
+            TemperalMatches.push_back(cv::DMatch(count,count,0));
+            count = count + 1;
+            // cout << anno1.at<int>(i,2) << " " << anno1.at<int>(i,3) << " " << anno1.at<int>(i,4) << " " << anno1.at<int>(i,5) << endl;
+        }     
+    }
+    // // --- from img2 to img1 ....... //
+    // for (size_t i = 0; i < anno2.rows; i++)
+    // {
+    //     if (anno2.at<int>(i,1)==f1)
+    //     {
+    //         PreKeys.push_back(cv::KeyPoint(anno2.at<int>(i,5),anno2.at<int>(i,4),0,0,0,-1));
+    //         CurKeys.push_back(cv::KeyPoint(anno2.at<int>(i,3),anno2.at<int>(i,2),0,0,0,-1));
+    //         TemperalMatches.push_back(cv::DMatch(count,count,0));
+    //         count = count + 1;
+    //     }     
+    // }
+
+    // cout << "number of matched keypoints: " << count << endl;
+
+    // // --- demonstrate --- //
+    // cv::Mat img_matches;
+    // cv::drawMatches(img1, PreKeys, img2, CurKeys, TemperalMatches, img_matches, cv::Scalar::all(-1), cv::Scalar::all(-1),
+    //                 vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    // cv::namedWindow("temperal matches", cv::WINDOW_NORMAL);
+    // cv::imshow("temperal matches", img_matches);
+    // cv::waitKey(0);
+
+    return;
 }
 
 cv::Mat Util::GetFilterMask(cv::Mat &sss_raw_img)

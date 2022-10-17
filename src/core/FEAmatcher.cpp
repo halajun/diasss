@@ -1,6 +1,6 @@
 
 #include "FEAmatcher.h"
-
+#include <bits/stdc++.h>
 
 namespace Diasss
 {
@@ -21,30 +21,109 @@ std::vector<std::pair<size_t, size_t>> FEAmatcher::RobustMatching(Frame &SourceF
     cv::Mat dst_2 = TargetFrame.dst;
     cv::Mat geo_img_1 = SourceFrame.geo_img;
     cv::Mat geo_img_2 = TargetFrame.geo_img;
+    std::vector<std::pair<int,double>> scc_1, scc_2;
 
-    std::vector<int> CorresID_1 = FEAmatcher::GeoNearNeighSearch(SourceFrame.norm_img,TargetFrame.norm_img,kps_1,dst_1,geo_img_1,kps_2,dst_2,geo_img_2);
-    std::vector<int> CorresID_2 = FEAmatcher::GeoNearNeighSearch(TargetFrame.norm_img,SourceFrame.norm_img,kps_2,dst_2,geo_img_2,kps_1,dst_1,geo_img_1);
+    std::vector<int> CorresID_1 = FEAmatcher::GeoNearNeighSearch(SourceFrame.img_id,TargetFrame.img_id,SourceFrame.norm_img,TargetFrame.norm_img,
+                                                                 kps_1,dst_1,geo_img_1,kps_2,dst_2,geo_img_2, scc_1);
+    std::vector<int> CorresID_2 = FEAmatcher::GeoNearNeighSearch(TargetFrame.img_id,SourceFrame.img_id,TargetFrame.norm_img,SourceFrame.norm_img,
+                                                                 kps_2,dst_2,geo_img_2,kps_1,dst_1,geo_img_1, scc_2);
 
-    // --- cross-check --- //
+    std::sort(scc_1.rbegin(), scc_1.rend());
+    std::sort(scc_2.rbegin(), scc_2.rend());
+    for (size_t i = 0; i < 5; i++)
+    {
+        if (scc_1[i].first!=-1)       
+            cout << "scc_1: " << scc_1[i].first << " " << scc_1[i].second+abs(SourceFrame.norm_img.rows-TargetFrame.norm_img.rows) << endl;
+    }
+    for (size_t i = 0; i < 5; i++)
+    {
+        if (scc_2[i].first!=-1)       
+            cout << "scc_2: " << scc_2[i].first << " " << scc_2[i].second << endl;
+    }
+    
+    
     std::vector<cv::KeyPoint> PreKeys, CurKeys;
     std::vector<cv::DMatch> TemperalMatches;
     int count = 0;
-    for (size_t i = 0; i < CorresID_1.size(); i++)
+    // --- merge if the sliding compatibility check is consistent --- //
+    if (abs(scc_1[0].second-scc_2[0].second)<1.0)
     {
-        if (CorresID_1[i]==-1)
-            continue;
-
-        if (CorresID_2[CorresID_1[i]]==i)
+        for (size_t i = 0; i < CorresID_1.size(); i++)
         {
+            if (CorresID_1[i]==-1)
+                continue;
+
+            if (CorresID_2[CorresID_1[i]]==i)
+                continue;
+
             PreKeys.push_back(kps_1[i]);
             CurKeys.push_back(kps_2[CorresID_1[i]]);
             TemperalMatches.push_back(cv::DMatch(count,count,0));
-            count = count + 1;
-        }     
+            count = count + 1;    
+        }
+
+        for (size_t i = 0; i < CorresID_2.size(); i++)
+        {
+            if (CorresID_2[i]==-1)
+                continue;
+                
+            PreKeys.push_back(kps_2[i]);
+            CurKeys.push_back(kps_1[CorresID_2[i]]);
+            TemperalMatches.push_back(cv::DMatch(count,count,0));
+            count = count + 1;    
+        }       
     }
+    // --- otherwise, keep the matched pairs from the direction with more pairs --- //
+    else
+    {
+        const int inl_num_1 = CorresID_1.size()-std::count(CorresID_1.begin(), CorresID_1.end(), -1);
+        const int inl_num_2 = CorresID_2.size()-std::count(CorresID_2.begin(), CorresID_2.end(), -1);
+        if (inl_num_1>inl_num_2)
+        {
+            for (size_t i = 0; i < CorresID_1.size(); i++)
+            {
+                if (CorresID_1[i]==-1)
+                    continue;
+                    
+                PreKeys.push_back(kps_1[i]);
+                CurKeys.push_back(kps_2[CorresID_1[i]]);
+                TemperalMatches.push_back(cv::DMatch(count,count,0));
+                count = count + 1;    
+            }
+        }
+        else
+        {
+            for (size_t i = 0; i < CorresID_2.size(); i++)
+            {
+                if (CorresID_2[i]==-1)
+                    continue;
+                    
+                PreKeys.push_back(kps_2[i]);
+                CurKeys.push_back(kps_1[CorresID_2[i]]);
+                TemperalMatches.push_back(cv::DMatch(count,count,0));
+                count = count + 1;    
+            }
+        }
+               
+    }
+    
+    // // --- cross-check --- //
+    // std::vector<cv::KeyPoint> PreKeys, CurKeys;
+    // std::vector<cv::DMatch> TemperalMatches;
+    // int count = 0;
+    // for (size_t i = 0; i < CorresID_1.size(); i++)
+    // {
+    //     if (CorresID_1[i]==-1)
+    //         continue;
 
-    // --- ratio test --- //
-
+    //     if (CorresID_2[CorresID_1[i]]==i)
+    //     {
+    //         PreKeys.push_back(kps_1[i]);
+    //         CurKeys.push_back(kps_2[CorresID_1[i]]);
+    //         TemperalMatches.push_back(cv::DMatch(count,count,0));
+    //         count = count + 1;
+    //     }     
+    // }
 
     // --- demonstrate --- //
     cv::Mat img_matches;
@@ -55,17 +134,19 @@ std::vector<std::pair<size_t, size_t>> FEAmatcher::RobustMatching(Frame &SourceF
     cv::imshow("temperal matches", img_matches);
     cv::waitKey(0);
 
-
     return CorresPairs;
 
 }
 
-std::vector<int> FEAmatcher::GeoNearNeighSearch(const cv::Mat &img, const cv::Mat &img_ref,
+std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &img_id_ref,
+                                                const cv::Mat &img, const cv::Mat &img_ref,
                                                 const std::vector<cv::KeyPoint> &kps, const cv::Mat &dst, const cv::Mat &geo_img,
-                                                const std::vector<cv::KeyPoint> &kps_ref, const cv::Mat &dst_ref, const cv::Mat &geo_img_ref)
+                                                const std::vector<cv::KeyPoint> &kps_ref, const cv::Mat &dst_ref, const cv::Mat &geo_img_ref,
+                                                std::vector<std::pair<int,double>> &scc)
 {
-
+    cv::RNG rng((unsigned)time(NULL));
     std::vector<int> CorresID = std::vector<int>(kps.size(),-1);
+    std::vector<int> ID_loc;
 
     // --- some parameters --- //
     int radius = 12; // seach circle size
@@ -113,7 +194,7 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const cv::Mat &img, const cv::Ma
 
         // --- using SIFT --- //
         {
-            double best_dist = 1000, sec_best_dist = 1000, dist_bound = 100;
+            double best_dist = 1000, sec_best_dist = 1000, dist_bound = 150;
             int best_id = -1;
             double ratio_test = 0.3;
             for (size_t j = 0; j < candidate.size(); j++)
@@ -135,9 +216,15 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const cv::Mat &img, const cv::Ma
             double fir_sec_ratio = best_dist/sec_best_dist;
             // cout << "best and second best ratio: " << fir_sec_ratio << endl;
             if (best_id!=-1 && best_dist<dist_bound && fir_sec_ratio<=ratio_test)
+            {
                 CorresID[i] = best_id;
+                ID_loc.push_back(i);
+            }
             else if (candidate.size()==1 && best_dist<dist_bound)
+            {
                 CorresID[i] = best_id;
+                ID_loc.push_back(i);
+            }
         }
 
 
@@ -170,24 +257,120 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const cv::Mat &img, const cv::Ma
         //         CorresID[i] = best_id;
         // }
             
-
-        // if(candidate.size()>3)
-        // {
-        //     cout << "candidate size: " << candidate.size() << endl;
-        //     cv::Mat outimg_1, outimg_2;
-        //     kps_show.push_back(kps[i]);
-        //     cv::drawKeypoints(img, kps_show, outimg_1, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
-        //     cv::imshow("Detected Features 1",outimg_1);
-        //     cv::drawKeypoints(img_ref, kps_show_ref, outimg_2, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
-        //     cv::imshow("Detected Features 2",outimg_2);
-        //     cv::waitKey(0);
-        // }
-      
+             
         candidate.clear();
         kps_show.clear();
         kps_show_ref.clear();
 
     }
+
+    // --- Sliding Compatibility Check on the X axis of keypoints --- //
+    int final_inlier_num = 0, iter_num = 0, max_iter = 300, sam_num = 3;
+    double PixError = 2.0;
+    std::vector<int> CorresID_final = std::vector<int>(kps.size(),-1);
+    while (iter_num<max_iter)
+    {
+        int cur_inlier_num = 0;
+        std::vector<int> CorresID_iter = std::vector<int>(kps.size(),-1);
+
+        // random sample matched ID from CorresID
+        vector<int> sampled_ids(sam_num,0);
+        for (size_t i = 0; i < sam_num; i++)
+        {
+            const int getID = rng.uniform(0,ID_loc.size());
+            sampled_ids[i]=ID_loc[getID];
+            // cout << sampled_ids[i] << " ";
+        }
+        // calculate model X
+        double ModelX = 0;
+        for (size_t i = 0; i < sampled_ids.size(); i++)
+        {
+            if (img_id%2!=img_id_ref%2)
+                ModelX = ModelX + abs(kps[sampled_ids[i]].pt.y - (img_ref.rows-kps_ref[CorresID[sampled_ids[i]]].pt.y+1));
+            else
+                ModelX = ModelX + abs(kps[sampled_ids[i]].pt.y - kps_ref[CorresID[sampled_ids[i]]].pt.y);
+        }
+        ModelX = ModelX/sam_num;
+        // fit all CorresID to Model, and find inliers
+        for (size_t j = 0; j < CorresID.size(); j++)
+        {
+          if (CorresID[j]==-1)
+              continue;
+   
+          double X_tmp;
+          if (img_id%2!=img_id_ref%2)
+          {
+              X_tmp= abs(kps[j].pt.y - (img_ref.rows-kps_ref[CorresID[j]].pt.y+1));
+          }
+          else
+              X_tmp= abs(kps[j].pt.y - kps_ref[CorresID[j]].pt.y);
+              
+          // cout << "distance: " << abs(ModelX-X_tmp) << endl;
+          if (abs(ModelX-X_tmp)<=PixError)
+          {
+            CorresID_iter[j] = CorresID[j];
+            cur_inlier_num = cur_inlier_num + 1;
+          }          
+        }
+        // update the most inlier set
+        if (final_inlier_num<cur_inlier_num)
+        {
+          CorresID_final = CorresID_iter;
+          final_inlier_num = cur_inlier_num;
+          scc.push_back(std::make_pair(cur_inlier_num,ModelX)); 
+        }
+
+        iter_num = iter_num + 1;
+    }
+    cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+    CorresID = CorresID_final;
+    cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+    
+    // for (size_t i = 0; i < CorresID.size(); i++)
+    // {
+    //     if (CorresID[i]==-1)
+    //         continue;
+
+    //     int cur_inlier_num = 0;
+    //     std::vector<int> CorresID_iter = std::vector<int>(kps.size(),-1);
+    //     double ModelX;
+    //     if (img_id%2!=img_id_ref%2)
+    //         ModelX = abs(kps[i].pt.y - (img_ref.rows-kps_ref[CorresID[i]].pt.y+1));
+    //     else
+    //         ModelX = abs(kps[i].pt.y - kps_ref[CorresID[i]].pt.y);
+    //     for (size_t j = 0; j < CorresID.size(); j++)
+    //     {
+    //       if (CorresID[j]==-1)
+    //           continue;
+   
+    //       double X_tmp;
+    //       if (img_id%2!=img_id_ref%2)
+    //       {
+    //           X_tmp= abs(kps[j].pt.y - (img_ref.rows-kps_ref[CorresID[j]].pt.y+1));
+    //       }
+    //       else
+    //           X_tmp= abs(kps[j].pt.y - kps_ref[CorresID[j]].pt.y);
+              
+    //       // cout << "distance: " << abs(ModelX-X_tmp) << endl;
+    //       if (abs(ModelX-X_tmp)<=PixError)
+    //       {
+    //         CorresID_iter[j] = CorresID[j];
+    //         cur_inlier_num = cur_inlier_num + 1;
+    //       }          
+    //     }
+
+    //     // cout << "current inlier number: " << cur_inlier_num << endl;
+
+    //     if (final_inlier_num<cur_inlier_num)
+    //     {
+    //       CorresID_final = CorresID_iter;
+    //       final_inlier_num = cur_inlier_num;
+    //     }    
+    //     scc[i] = std::make_pair(cur_inlier_num,ModelX);    
+    // }
+    // cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+    // CorresID = CorresID_final;
+    // cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
   
     return CorresID;
 }

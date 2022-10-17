@@ -16,7 +16,8 @@ namespace Diasss
     public:
 
         // Constructor 
-        Frame(const int &id, const cv::Mat &mImg, const cv::Mat &mPose, const std::vector<double> &vAltt, const std::vector<double> &vGrange);
+        Frame(const int &id, const cv::Mat &mImg, const cv::Mat &mPose, const std::vector<double> &vAltt, 
+              const std::vector<double> &vGrange, const cv::Mat &mAnno);
 
         // processing with raw image
         cv::Mat GetNormalizeSSS(const cv::Mat &sss_raw_img);
@@ -25,6 +26,7 @@ namespace Diasss
 
         // Initialization items
         int img_id;
+        cv::Mat anno_kps;
         cv::Mat raw_img;
         cv::Mat dr_poses;
         std::vector<double> altitudes;

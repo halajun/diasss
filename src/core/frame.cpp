@@ -15,7 +15,8 @@ using namespace cv;
 
 #define PI 3.14159265359
 
-Frame::Frame(const int &id, const cv::Mat &mImg, const cv::Mat &mPose, const std::vector<double> &vAltt, const std::vector<double> &vGrange)
+Frame::Frame(const int &id, const cv::Mat &mImg, const cv::Mat &mPose, const std::vector<double> &vAltt, 
+             const std::vector<double> &vGrange, const cv::Mat &mAnno)
 {
 
     // --- initialize --- //
@@ -24,6 +25,7 @@ Frame::Frame(const int &id, const cv::Mat &mImg, const cv::Mat &mPose, const std
     altitudes = vAltt;
     ground_ranges = vGrange;
     img_id = id;
+    anno_kps = mAnno;
 
     // --- get normalized image --- //
     norm_img = GetNormalizeSSS(mImg);
@@ -153,14 +155,12 @@ void Frame::DetectFeature(const cv::Mat &img, const cv::Mat &mask, std::vector<c
     // cv::Ptr<SiftDescriptorExtractor> descriptor = SiftDescriptorExtractor::create();
     // cv::Ptr<FeatureDetector> detector = cv::ORB::create(1000);
     // cv::Ptr<DescriptorExtractor> descriptor = cv::ORB::create();
-    // cv::Ptr<FeatureDetector> detector = cv::ORB::create(500);
-    // cv::Ptr<SiftDescriptorExtractor> descriptor = SiftDescriptorExtractor::create();
     // detector->detect(img,kps,mask);
     // descriptor->compute(img, kps, dst);
 
     std::vector<cv::KeyPoint> keypoints;
     cv::Mat descriptors;
-    // cv::Mat descriptors = cv::Mat(0, 32, CV_8U);
+
     ORB_SLAM2::ORBextractor orb = ORB_SLAM2::ORBextractor(2000, 1.2, 6, 12, 7);
     orb(img, cv::Mat(), keypoints, descriptors);
 
@@ -173,6 +173,7 @@ void Frame::DetectFeature(const cv::Mat &img, const cv::Mat &mask, std::vector<c
         {
             kps.push_back(keypoints[i]);
             dst.push_back(descriptors.row(i));
+            // cout << keypoints[i].pt.y << " " << keypoints[i].pt.x << endl;
         }
         
     }

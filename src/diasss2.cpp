@@ -73,80 +73,14 @@ int main(int argc, char** argv)
                       vmImgs,vmPoses,vvAltts,vvGranges,vmAnnos);
 
   int f1 = 0, f2 = 1;
-  Frame frame0 = Frame(f1,vmImgs[f1],vmPoses[f1],vvAltts[f1],vvGranges[f1]);
-  Frame frame1 = Frame(f2,vmImgs[f2],vmPoses[f2],vvAltts[f2],vvGranges[f2]);
+  Frame frame0 = Frame(f1,vmImgs[f1],vmPoses[f1],vvAltts[f1],vvGranges[f1],vmAnnos[f1]);
+  Frame frame1 = Frame(f2,vmImgs[f2],vmPoses[f2],vvAltts[f2],vvGranges[f2],vmAnnos[f2]);
 
+  Util::ShowAnnos(f1, f2, frame0.norm_img, frame1.norm_img, frame0.anno_kps, frame1.anno_kps);
   std::vector<pair<size_t, size_t> > vkpCorres = FEAmatcher::RobustMatching(frame0,frame1);
 
-  // cv::Mat outimg_1, outimg_2;
-  // cv::drawKeypoints(frame0.norm_img, frame0.kps, outimg_1, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
-  // cv::imshow("Detected Features 1",outimg_1);
-  // cv::drawKeypoints(frame1.norm_img, frame1.kps, outimg_2, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
-  // cv::imshow("Detected Features 2",outimg_2);
-  // cv::waitKey(0); 
 
-  // cv::Mat flt_mask = Util::GetFilterMask(vmImgs[0]);
-  // cv::Mat img_1 = Util::NormalizeSSS(vmImgs[0]);
-  // cv::Mat img_2 = Util::NormalizeSSS(vmImgs[2]);
 
-  // --- detect features --- //
-  // Eigen::MatrixXd img_1_tmp;
-  // cv::cv2eigen(vmImgs[0], img_1_tmp);
-  // cv::Mat img_1 = Util::NormalizeConvertSSS(img_1_tmp);
-
-  // std::vector<cv::KeyPoint> keypoints_1,keypoints_2;
-  // cv::Mat descriptors_1,descriptors_2;
-  // cv::Ptr<SIFT> detector = SIFT::create(200);
-  // cv::Ptr<SiftDescriptorExtractor> descriptor = SiftDescriptorExtractor::create();
-  // // cv::Ptr<FeatureDetector> detector = cv::ORB::create(100);
-  // // cv::Ptr<DescriptorExtractor> descriptor = cv::ORB::create();
-  // detector->detect(img_1,keypoints_1);
-  // detector->detect(img_2,keypoints_2);
-  // descriptor->compute(img_1, keypoints_1, descriptors_1);
-  // descriptor->compute(img_2, keypoints_2, descriptors_2);
-
-  // cv::Mat outimg_1, outimg_2;
-  // cv::drawKeypoints(img_1, keypoints_1, outimg_1, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
-  // cv::imshow("Detected Features 1",outimg_1);
-  // cv::drawKeypoints(img_2, keypoints_2, outimg_2, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
-  // cv::imshow("Detected Features 2",outimg_2);
-  // cv::waitKey(0); 
-
-	// cv::BFMatcher matcher(NORM_L2);
-	// std::vector<cv::DMatch> matches;
-	// matcher.match(descriptors_1, descriptors_2, matches);
-
-	// // get max and min distance
-	// double max_dist = 0;
-	// double min_dist = 1000;
-	// for (int i = 1; i < descriptors_1.rows; ++i)
-	// {
-	// 	double dist = matches[i].distance;
-	// 	if (dist > max_dist)
-	// 		max_dist = dist;
-	// 	if (dist < min_dist)
-	// 		min_dist = dist;
-	// }
-	// cout << "min_dist=" << min_dist << endl;
-	// cout << "max_dist=" << max_dist << endl;
-
-	// // get good matches    
-	// vector<DMatch> goodMatches;
-	// for (int i = 0; i < matches.size(); ++i)
-	// {
-	// 	double dist = matches[i].distance;
-	// 	if (dist < 2 * min_dist)
-	// 		goodMatches.push_back(matches[i]);
-	// }
-	// cout << "goodMatches:" << goodMatches.size() << endl;
-
-  // // draw the matching result
-	// cv::Mat result;
-	// cv::drawMatches(img_1, keypoints_1, img_2, keypoints_2, goodMatches, result,
-  //                 Scalar(255, 255, 0), Scalar::all(-1), vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-	// cv::namedWindow("temperal matches", cv::WINDOW_NORMAL);
-	// imshow("temperal matches", result);
-	// waitKey(0);
 
 
   // // --- extract patch pairs for test --- //
@@ -221,17 +155,6 @@ int main(int argc, char** argv)
   // cv::namedWindow("Edge Map", cv::WINDOW_AUTOSIZE);
   // imshow("Edge Map", edge_result);
   // cv::waitKey(0);
-
-
-
-
-
-
-
-
-
-
-
 
 
 
