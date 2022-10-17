@@ -72,7 +72,7 @@ int main(int argc, char** argv)
   Util::LoadInputData(strImageFolder,strPoseFolder,strAltitudeFolder,strGroundRangeFolder,strAnnotationFolder,
                       vmImgs,vmPoses,vvAltts,vvGranges,vmAnnos);
 
-  int f1 = 0, f2 = 1;
+  int f1 = 2, f2 = 1;
   Frame frame0 = Frame(f1,vmImgs[f1],vmPoses[f1],vvAltts[f1],vvGranges[f1],vmAnnos[f1]);
   Frame frame1 = Frame(f2,vmImgs[f2],vmPoses[f2],vvAltts[f2],vvGranges[f2],vmAnnos[f2]);
 

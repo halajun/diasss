@@ -30,12 +30,12 @@ std::vector<std::pair<size_t, size_t>> FEAmatcher::RobustMatching(Frame &SourceF
 
     std::sort(scc_1.rbegin(), scc_1.rend());
     std::sort(scc_2.rbegin(), scc_2.rend());
-    for (size_t i = 0; i < 5; i++)
+    for (size_t i = 0; i < 3; i++)
     {
         if (scc_1[i].first!=-1)       
-            cout << "scc_1: " << scc_1[i].first << " " << scc_1[i].second+abs(SourceFrame.norm_img.rows-TargetFrame.norm_img.rows) << endl;
+            cout << "scc_1: " << scc_1[i].first << " " << scc_1[i].second << " " << abs(SourceFrame.norm_img.rows-TargetFrame.norm_img.rows) << endl;
     }
-    for (size_t i = 0; i < 5; i++)
+    for (size_t i = 0; i < 3; i++)
     {
         if (scc_2[i].first!=-1)       
             cout << "scc_2: " << scc_2[i].first << " " << scc_2[i].second << endl;
@@ -46,7 +46,9 @@ std::vector<std::pair<size_t, size_t>> FEAmatcher::RobustMatching(Frame &SourceF
     std::vector<cv::DMatch> TemperalMatches;
     int count = 0;
     // --- merge if the sliding compatibility check is consistent --- //
-    if (abs(scc_1[0].second-scc_2[0].second)<1.0)
+    double img_diff = abs(SourceFrame.norm_img.rows-TargetFrame.norm_img.rows);
+    double kp_diff = abs(abs(scc_1[0].second-scc_2[0].second)-img_diff);
+    if (kp_diff<1.0)
     {
         for (size_t i = 0; i < CorresID_1.size(); i++)
         {
@@ -67,8 +69,8 @@ std::vector<std::pair<size_t, size_t>> FEAmatcher::RobustMatching(Frame &SourceF
             if (CorresID_2[i]==-1)
                 continue;
                 
-            PreKeys.push_back(kps_2[i]);
-            CurKeys.push_back(kps_1[CorresID_2[i]]);
+            PreKeys.push_back(kps_1[CorresID_2[i]]);
+            CurKeys.push_back(kps_2[i]);
             TemperalMatches.push_back(cv::DMatch(count,count,0));
             count = count + 1;    
         }       
@@ -98,8 +100,8 @@ std::vector<std::pair<size_t, size_t>> FEAmatcher::RobustMatching(Frame &SourceF
                 if (CorresID_2[i]==-1)
                     continue;
                     
-                PreKeys.push_back(kps_2[i]);
-                CurKeys.push_back(kps_1[CorresID_2[i]]);
+                PreKeys.push_back(kps_1[CorresID_2[i]]);
+                CurKeys.push_back(kps_2[i]);
                 TemperalMatches.push_back(cv::DMatch(count,count,0));
                 count = count + 1;    
             }
@@ -325,52 +327,6 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
     cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
     CorresID = CorresID_final;
     cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
-    
-    // for (size_t i = 0; i < CorresID.size(); i++)
-    // {
-    //     if (CorresID[i]==-1)
-    //         continue;
-
-    //     int cur_inlier_num = 0;
-    //     std::vector<int> CorresID_iter = std::vector<int>(kps.size(),-1);
-    //     double ModelX;
-    //     if (img_id%2!=img_id_ref%2)
-    //         ModelX = abs(kps[i].pt.y - (img_ref.rows-kps_ref[CorresID[i]].pt.y+1));
-    //     else
-    //         ModelX = abs(kps[i].pt.y - kps_ref[CorresID[i]].pt.y);
-    //     for (size_t j = 0; j < CorresID.size(); j++)
-    //     {
-    //       if (CorresID[j]==-1)
-    //           continue;
-   
-    //       double X_tmp;
-    //       if (img_id%2!=img_id_ref%2)
-    //       {
-    //           X_tmp= abs(kps[j].pt.y - (img_ref.rows-kps_ref[CorresID[j]].pt.y+1));
-    //       }
-    //       else
-    //           X_tmp= abs(kps[j].pt.y - kps_ref[CorresID[j]].pt.y);
-              
-    //       // cout << "distance: " << abs(ModelX-X_tmp) << endl;
-    //       if (abs(ModelX-X_tmp)<=PixError)
-    //       {
-    //         CorresID_iter[j] = CorresID[j];
-    //         cur_inlier_num = cur_inlier_num + 1;
-    //       }          
-    //     }
-
-    //     // cout << "current inlier number: " << cur_inlier_num << endl;
-
-    //     if (final_inlier_num<cur_inlier_num)
-    //     {
-    //       CorresID_final = CorresID_iter;
-    //       final_inlier_num = cur_inlier_num;
-    //     }    
-    //     scc[i] = std::make_pair(cur_inlier_num,ModelX);    
-    // }
-    // cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
-    // CorresID = CorresID_final;
-    // cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
   
     return CorresID;
 }
