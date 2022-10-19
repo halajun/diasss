@@ -10,7 +10,7 @@ using namespace cv;
 
 #define PI 3.14159265359
 
-std::vector<std::pair<size_t, size_t>> FEAmatcher::RobustMatching(Frame &SourceFrame, Frame &TargetFrame)
+void FEAmatcher::RobustMatching(Frame &SourceFrame, Frame &TargetFrame)
 {
 
     std::vector<std::pair<size_t, size_t> > CorresPairs;
@@ -28,115 +28,24 @@ std::vector<std::pair<size_t, size_t>> FEAmatcher::RobustMatching(Frame &SourceF
     std::vector<int> CorresID_2 = FEAmatcher::GeoNearNeighSearch(TargetFrame.img_id,SourceFrame.img_id,TargetFrame.norm_img,SourceFrame.norm_img,
                                                                  kps_2,dst_2,geo_img_2,kps_1,dst_1,geo_img_1, scc_2);
 
-    std::sort(scc_1.rbegin(), scc_1.rend());
-    std::sort(scc_2.rbegin(), scc_2.rend());
-    for (size_t i = 0; i < 3; i++)
-    {
-        if (scc_1[i].first!=-1)       
-            cout << "scc_1: " << scc_1[i].first << " " << scc_1[i].second << " " << abs(SourceFrame.norm_img.rows-TargetFrame.norm_img.rows) << endl;
-    }
-    for (size_t i = 0; i < 3; i++)
-    {
-        if (scc_2[i].first!=-1)       
-            cout << "scc_2: " << scc_2[i].first << " " << scc_2[i].second << endl;
-    }
-    
-    
-    std::vector<cv::KeyPoint> PreKeys, CurKeys;
-    std::vector<cv::DMatch> TemperalMatches;
-    int count = 0;
-    // --- merge if the sliding compatibility check is consistent --- //
-    double img_diff = abs(SourceFrame.norm_img.rows-TargetFrame.norm_img.rows);
-    double kp_diff = abs(abs(scc_1[0].second-scc_2[0].second)-img_diff);
-    if (kp_diff<1.0)
-    {
-        for (size_t i = 0; i < CorresID_1.size(); i++)
-        {
-            if (CorresID_1[i]==-1)
-                continue;
+    std::vector<cv::KeyPoint> SourceKeys, TargetKeys;
+    FEAmatcher::ConsistentCheck(SourceFrame,TargetFrame,CorresID_1,CorresID_2,scc_1,scc_2,SourceKeys,TargetKeys);
 
-            if (CorresID_2[CorresID_1[i]]==i)
-                continue;
-
-            PreKeys.push_back(kps_1[i]);
-            CurKeys.push_back(kps_2[CorresID_1[i]]);
-            TemperalMatches.push_back(cv::DMatch(count,count,0));
-            count = count + 1;    
-        }
-
-        for (size_t i = 0; i < CorresID_2.size(); i++)
-        {
-            if (CorresID_2[i]==-1)
-                continue;
-                
-            PreKeys.push_back(kps_1[CorresID_2[i]]);
-            CurKeys.push_back(kps_2[i]);
-            TemperalMatches.push_back(cv::DMatch(count,count,0));
-            count = count + 1;    
-        }       
-    }
-    // --- otherwise, keep the matched pairs from the direction with more pairs --- //
-    else
+    // save matches to Frame
+    for (size_t i = 0; i < SourceKeys.size(); i++)
     {
-        const int inl_num_1 = CorresID_1.size()-std::count(CorresID_1.begin(), CorresID_1.end(), -1);
-        const int inl_num_2 = CorresID_2.size()-std::count(CorresID_2.begin(), CorresID_2.end(), -1);
-        if (inl_num_1>inl_num_2)
-        {
-            for (size_t i = 0; i < CorresID_1.size(); i++)
-            {
-                if (CorresID_1[i]==-1)
-                    continue;
-                    
-                PreKeys.push_back(kps_1[i]);
-                CurKeys.push_back(kps_2[CorresID_1[i]]);
-                TemperalMatches.push_back(cv::DMatch(count,count,0));
-                count = count + 1;    
-            }
-        }
-        else
-        {
-            for (size_t i = 0; i < CorresID_2.size(); i++)
-            {
-                if (CorresID_2[i]==-1)
-                    continue;
-                    
-                PreKeys.push_back(kps_1[CorresID_2[i]]);
-                CurKeys.push_back(kps_2[i]);
-                TemperalMatches.push_back(cv::DMatch(count,count,0));
-                count = count + 1;    
-            }
-        }
-               
+        cv::Mat1d kp_pair_s = (cv::Mat1d(1,6)<<SourceFrame.img_id,TargetFrame.img_id,
+                                               SourceKeys[i].pt.y,SourceKeys[i].pt.x,
+                                               TargetKeys[i].pt.y,TargetKeys[i].pt.x);
+        SourceFrame.corres_kps.push_back(kp_pair_s);
+        cv::Mat1d kp_pair_t = (cv::Mat1d(1,6)<<TargetFrame.img_id,SourceFrame.img_id,
+                                               TargetKeys[i].pt.y,TargetKeys[i].pt.x,
+                                               SourceKeys[i].pt.y,SourceKeys[i].pt.x);
+        TargetFrame.corres_kps.push_back(kp_pair_t);        
     }
     
-    // // --- cross-check --- //
-    // std::vector<cv::KeyPoint> PreKeys, CurKeys;
-    // std::vector<cv::DMatch> TemperalMatches;
-    // int count = 0;
-    // for (size_t i = 0; i < CorresID_1.size(); i++)
-    // {
-    //     if (CorresID_1[i]==-1)
-    //         continue;
 
-    //     if (CorresID_2[CorresID_1[i]]==i)
-    //     {
-    //         PreKeys.push_back(kps_1[i]);
-    //         CurKeys.push_back(kps_2[CorresID_1[i]]);
-    //         TemperalMatches.push_back(cv::DMatch(count,count,0));
-    //         count = count + 1;
-    //     }     
-    // }
-
-    // --- demonstrate --- //
-    cv::Mat img_matches;
-    cv::drawMatches(SourceFrame.norm_img, PreKeys, TargetFrame.norm_img, CurKeys,
-                TemperalMatches, img_matches, cv::Scalar::all(-1), cv::Scalar::all(-1),
-                vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-    cv::namedWindow("temperal matches", cv::WINDOW_NORMAL);
-    cv::imshow("temperal matches", img_matches);
-    cv::waitKey(0);
-
-    return CorresPairs;
+    return;
 
 }
 
@@ -329,6 +238,123 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
     cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
   
     return CorresID;
+}
+
+void FEAmatcher::ConsistentCheck(const Frame &SourceFrame, const Frame &TargetFrame,
+                                 const std::vector<int> &CorresID_1,const std::vector<int> &CorresID_2,
+                                 std::vector<std::pair<int,double>> &scc_1, std::vector<std::pair<int,double>> &scc_2,
+                                 std::vector<cv::KeyPoint> &SourceKeys, std::vector<cv::KeyPoint> &TargetKeys)
+{
+    bool show_match = 0;
+    double kp_diff_thres = 2.5;
+
+    std::sort(scc_1.rbegin(), scc_1.rend());
+    std::sort(scc_2.rbegin(), scc_2.rend());
+    for (size_t i = 0; i < 3; i++)
+        cout << "scc_1: " << scc_1[i].first << " " << scc_1[i].second << " " << abs(SourceFrame.norm_img.rows-TargetFrame.norm_img.rows) << endl;
+    for (size_t i = 0; i < 3; i++)
+        cout << "scc_2: " << scc_2[i].first << " " << scc_2[i].second << endl;
+    
+    std::vector<cv::DMatch> TemperalMatches;
+    int count = 0;
+    // --- merge if the sliding compatibility check is consistent --- //
+    double img_diff = 0;
+    if (SourceFrame.img_id%2!=TargetFrame.img_id%2)
+        img_diff = abs(SourceFrame.norm_img.rows-TargetFrame.norm_img.rows);    
+    double kp_diff = abs(abs(scc_1[0].second-scc_2[0].second)-img_diff);
+    if (kp_diff<=kp_diff_thres)
+    {
+        cout << "kp_diff: " << kp_diff << endl;
+        for (size_t i = 0; i < CorresID_1.size(); i++)
+        {
+            if (CorresID_1[i]==-1)
+                continue;
+
+            if (CorresID_2[CorresID_1[i]]==i)
+                continue;
+
+            SourceKeys.push_back(SourceFrame.kps[i]);
+            TargetKeys.push_back(TargetFrame.kps[CorresID_1[i]]);
+            TemperalMatches.push_back(cv::DMatch(count,count,0));
+            count = count + 1;    
+        }
+
+        for (size_t i = 0; i < CorresID_2.size(); i++)
+        {
+            if (CorresID_2[i]==-1)
+                continue;
+                
+            SourceKeys.push_back(SourceFrame.kps[CorresID_2[i]]);
+            TargetKeys.push_back(TargetFrame.kps[i]);
+            TemperalMatches.push_back(cv::DMatch(count,count,0));
+            count = count + 1;    
+        }       
+    }
+    // --- otherwise, keep the matched pairs from the direction with more pairs --- //
+    else
+    {
+        const int inl_num_1 = CorresID_1.size()-std::count(CorresID_1.begin(), CorresID_1.end(), -1);
+        const int inl_num_2 = CorresID_2.size()-std::count(CorresID_2.begin(), CorresID_2.end(), -1);
+        if (inl_num_1>inl_num_2)
+        {
+            for (size_t i = 0; i < CorresID_1.size(); i++)
+            {
+                if (CorresID_1[i]==-1)
+                    continue;
+                    
+                SourceKeys.push_back(SourceFrame.kps[i]);
+                TargetKeys.push_back(TargetFrame.kps[CorresID_1[i]]);
+                TemperalMatches.push_back(cv::DMatch(count,count,0));
+                count = count + 1;    
+            }
+        }
+        else
+        {
+            for (size_t i = 0; i < CorresID_2.size(); i++)
+            {
+                if (CorresID_2[i]==-1)
+                    continue;
+                    
+                SourceKeys.push_back(SourceFrame.kps[CorresID_2[i]]);
+                TargetKeys.push_back(TargetFrame.kps[i]);
+                TemperalMatches.push_back(cv::DMatch(count,count,0));
+                count = count + 1;    
+            }
+        }
+               
+    }
+    
+    // // --- cross-check --- //
+    // std::vector<cv::KeyPoint> PreKeys, CurKeys;
+    // std::vector<cv::DMatch> TemperalMatches;
+    // int count = 0;
+    // for (size_t i = 0; i < CorresID_1.size(); i++)
+    // {
+    //     if (CorresID_1[i]==-1)
+    //         continue;
+
+    //     if (CorresID_2[CorresID_1[i]]==i)
+    //     {
+    //         PreKeys.push_back(kps_1[i]);
+    //         CurKeys.push_back(kps_2[CorresID_1[i]]);
+    //         TemperalMatches.push_back(cv::DMatch(count,count,0));
+    //         count = count + 1;
+    //     }     
+    // }
+
+    // --- demonstrate --- //
+    if (show_match)
+    {
+        cv::Mat img_matches;
+        cv::drawMatches(SourceFrame.norm_img, SourceKeys, TargetFrame.norm_img, TargetKeys,
+                    TemperalMatches, img_matches, cv::Scalar::all(-1), cv::Scalar::all(-1),
+                    vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+        cv::namedWindow("temperal matches", cv::WINDOW_NORMAL);
+        cv::imshow("temperal matches", img_matches);
+        cv::waitKey(0); 
+    } 
+
+
 }
 
 // http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel

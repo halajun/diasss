@@ -36,6 +36,7 @@ namespace Diasss
         cv::Mat flt_mask; // binary, mask for filtering area that could be ignored;
         std::vector<cv::KeyPoint> kps; // detected keypoints
         cv::Mat dst; // descriptors of detected keypoints
+        cv::Mat corres_kps; // correspondences of keypoints. row: frame_id, ref_frame_id, kp_x, kp_y, kp_ref_x, kp_ref_y
 
         // Image geo-referenced location in x, y and z
         cv::Mat geo_img;
