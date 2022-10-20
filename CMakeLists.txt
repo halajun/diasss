@@ -16,6 +16,7 @@ find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
 # find_package(PCL REQUIRED)
 find_package(Boost COMPONENTS system filesystem date_time thread REQUIRED)
+find_package(GTSAM REQUIRED)
 
 # find_package(LibXTF REQUIRED)
 # find_package(LibGSF REQUIRED)
@@ -38,12 +39,14 @@ include_directories(
 	${THIRDPARTY_DIRS}
 	${Boost_INCLUDE_DIRS}
 	${EIGEN_INCLUDE_DIRS}
-	${OpenCV_INCLUDE_DIRS} 
+	${OpenCV_INCLUDE_DIRS}
+	${GTSAM_INCLUDE_DIR} 
 	# ${PCL_INCLUDE_DIRS}
 	)
 
 link_directories(
 	${Boost_LIBRARY_DIRS}
+	${GTSAM_LIBRARY_DIRS}
 	# ${PCL_LIBRARY_DIRS}
 	)
 
@@ -55,7 +58,7 @@ add_executable(test_demo
                src/diasss2.cpp)
 
 target_link_libraries(test_demo
-		diasss 
+		diasss gtsam
 		${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
 # target_link_libraries(test_demo
 #                       diasss gsf_data xtf_data csv_data navi_data all_data 
