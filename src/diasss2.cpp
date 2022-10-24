@@ -23,70 +23,72 @@ using namespace Diasss;
 
 int main(int argc, char** argv)
 {
-  std::string strImageFolder, strPoseFolder, strAltitudeFolder, strGroundRangeFolder, strAnnotationFolder;
+    std::string strImageFolder, strPoseFolder, strAltitudeFolder, strGroundRangeFolder, strAnnotationFolder;
 
-  // --- read input data paths --- //
-  {
-    cxxopts::Options options("data_parsing", "Reads input files...");
-    options.add_options()
-        ("help", "Print help")
-        ("image", "Input folder containing sss image files", cxxopts::value(strImageFolder))
-        ("pose", "Input folder containing auv pose files", cxxopts::value(strPoseFolder))
-        ("altitude", "Input folder containing auv altitude files", cxxopts::value(strAltitudeFolder))
-        ("groundrange", "Input folder containing ground range files", cxxopts::value(strGroundRangeFolder))
-        ("annotation", "Input folder containing annotation files", cxxopts::value(strAnnotationFolder));
+    // --- read input data paths --- //
+    {
+      cxxopts::Options options("data_parsing", "Reads input files...");
+      options.add_options()
+          ("help", "Print help")
+          ("image", "Input folder containing sss image files", cxxopts::value(strImageFolder))
+          ("pose", "Input folder containing auv pose files", cxxopts::value(strPoseFolder))
+          ("altitude", "Input folder containing auv altitude files", cxxopts::value(strAltitudeFolder))
+          ("groundrange", "Input folder containing ground range files", cxxopts::value(strGroundRangeFolder))
+          ("annotation", "Input folder containing annotation files", cxxopts::value(strAnnotationFolder));
 
-    auto result = options.parse(argc, argv);
-    if (result.count("help")) {
-      cout << options.help({"", "Group"}) << endl;
-      exit(0);
+      auto result = options.parse(argc, argv);
+      if (result.count("help")) {
+        cout << options.help({"", "Group"}) << endl;
+        exit(0);
+      }
+      if (result.count("image") == 0) {
+        cout << "Please provide folder containing sss image files..." << endl;
+        exit(0);
+      }
+      if (result.count("pose") == 0) {
+        cout << "Please provide folder containing auv poses files..." << endl;
+        exit(0);
+      }
+      if (result.count("altitude") == 0) {
+        cout << "Please provide folder containing auv altitude files..." << endl;
+        exit(0);
+      }
+      if (result.count("groundrange") == 0) {
+        cout << "Please provide folder containing ground range files..." << endl;
+        exit(0);
+      }
+      if (result.count("annotation") == 0) {
+        cout << "Please provide folder containing annotation files..." << endl;
+        exit(0);
+      }
     }
-    if (result.count("image") == 0) {
-      cout << "Please provide folder containing sss image files..." << endl;
-      exit(0);
-    }
-    if (result.count("pose") == 0) {
-      cout << "Please provide folder containing auv poses files..." << endl;
-      exit(0);
-    }
-    if (result.count("altitude") == 0) {
-      cout << "Please provide folder containing auv altitude files..." << endl;
-      exit(0);
-    }
-    if (result.count("groundrange") == 0) {
-      cout << "Please provide folder containing ground range files..." << endl;
-      exit(0);
-    }
-    if (result.count("annotation") == 0) {
-      cout << "Please provide folder containing annotation files..." << endl;
-      exit(0);
-    }
-  }
 
-  // --- parse input data --- //
-  std::vector<cv::Mat> vmImgs;
-  std::vector<cv::Mat> vmPoses;
-  std::vector<std::vector<double>> vvAltts;
-  std::vector<std::vector<double>> vvGranges;
-  std::vector<cv::Mat> vmAnnos;
-  Util::LoadInputData(strImageFolder,strPoseFolder,strAltitudeFolder,strGroundRangeFolder,strAnnotationFolder,
-                      vmImgs,vmPoses,vvAltts,vvGranges,vmAnnos);
+    // --- parse input data --- //
+    std::vector<cv::Mat> vmImgs;
+    std::vector<cv::Mat> vmPoses;
+    std::vector<std::vector<double>> vvAltts;
+    std::vector<std::vector<double>> vvGranges;
+    std::vector<cv::Mat> vmAnnos;
+    Util::LoadInputData(strImageFolder,strPoseFolder,strAltitudeFolder,strGroundRangeFolder,strAnnotationFolder,
+                        vmImgs,vmPoses,vvAltts,vvGranges,vmAnnos);
 
-  // --- construct frame --- //
-  std::vector<Frame> test_frames;
-  for (size_t i = 0; i < vmImgs.size(); i++)
-      test_frames.push_back(Frame(i,vmImgs[i],vmPoses[i],vvAltts[i],vvGranges[i],vmAnnos[i]));
+    // --- construct frame --- //
+    std::vector<Frame> test_frames;
+    for (size_t i = 0; i < vmImgs.size(); i++)
+        test_frames.push_back(Frame(i,vmImgs[i],vmPoses[i],vvAltts[i],vvGranges[i],vmAnnos[i]));
 
-  // --- find correspondences between each pair of frames --- //
-  for (size_t i = 0; i < test_frames.size(); i++)
-      for (size_t j = i+1; j < test_frames.size(); j++)
-          FEAmatcher::RobustMatching(test_frames[i],test_frames[j]);
+    // --- find correspondences between each pair of frames --- //
+    for (size_t i = 0; i < test_frames.size(); i++)
+        for (size_t j = i+1; j < test_frames.size(); j++)
+            FEAmatcher::RobustMatching(test_frames[i],test_frames[j]);
 
 
 
+    Optimizer::TrajOptimizationPair(test_frames[0], test_frames[1]);
+    
+    
 
 
 
-
-  return 0;
+    return 0;
 }
