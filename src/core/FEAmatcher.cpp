@@ -19,8 +19,8 @@ void FEAmatcher::RobustMatching(Frame &SourceFrame, Frame &TargetFrame)
     std::vector<cv::KeyPoint> kps_2 = TargetFrame.kps;
     cv::Mat dst_1 = SourceFrame.dst;
     cv::Mat dst_2 = TargetFrame.dst;
-    cv::Mat geo_img_1 = SourceFrame.geo_img;
-    cv::Mat geo_img_2 = TargetFrame.geo_img;
+    std::vector<cv::Mat> geo_img_1 = SourceFrame.geo_img;
+    std::vector<cv::Mat> geo_img_2 = TargetFrame.geo_img;
     std::vector<std::pair<int,double>> scc_1, scc_2;
 
     std::vector<int> CorresID_1 = FEAmatcher::GeoNearNeighSearch(SourceFrame.img_id,TargetFrame.img_id,SourceFrame.norm_img,TargetFrame.norm_img,
@@ -51,8 +51,8 @@ void FEAmatcher::RobustMatching(Frame &SourceFrame, Frame &TargetFrame)
 
 std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &img_id_ref,
                                                 const cv::Mat &img, const cv::Mat &img_ref,
-                                                const std::vector<cv::KeyPoint> &kps, const cv::Mat &dst, const cv::Mat &geo_img,
-                                                const std::vector<cv::KeyPoint> &kps_ref, const cv::Mat &dst_ref, const cv::Mat &geo_img_ref,
+                                                const std::vector<cv::KeyPoint> &kps, const cv::Mat &dst, const std::vector<cv::Mat> &geo_img,
+                                                const std::vector<cv::KeyPoint> &kps_ref, const cv::Mat &dst_ref, const std::vector<cv::Mat> &geo_img_ref,
                                                 std::vector<std::pair<int,double>> &scc)
 {
     cv::RNG rng((unsigned)time(NULL));
@@ -65,30 +65,26 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
     double bx_min, bx_max, by_min, by_max; // geometric border of reference image
 
     // get boundary of the reference geo-image
-    cv::Mat channels_ref[3];
-    cv::split(geo_img_ref, channels_ref);
-    cv::minMaxLoc(channels_ref[0], &bx_min, &bx_max);
-    cv::minMaxLoc(channels_ref[1], &by_min, &by_max);
+    cv::minMaxLoc(geo_img_ref[0], &bx_min, &bx_max);
+    cv::minMaxLoc(geo_img_ref[1], &by_min, &by_max);
 
     // cout << "boundary: " << bx_min << " " << bx_max << " " << by_min << " " << by_max << endl;
 
     // --- main loop --- //
     vector<int> candidate;
     std::vector<cv::KeyPoint> kps_show, kps_show_ref;
-    cv::Mat channels[3];
-    cv::split(geo_img, channels);
     for (size_t i = 0; i < kps.size(); i++)
     {
-        double loc_x = channels[0].at<double>(kps[i].pt.y,kps[i].pt.x);
-        double loc_y = channels[1].at<double>(kps[i].pt.y,kps[i].pt.x);
+        double loc_x = geo_img[0].at<double>(kps[i].pt.y,kps[i].pt.x);
+        double loc_y = geo_img[1].at<double>(kps[i].pt.y,kps[i].pt.x);
 
         if (loc_x<bx_min || loc_y<by_min || loc_x>bx_max || loc_y>by_max)
             continue;
         
         for (size_t j = 0; j < kps_ref.size(); j++)
         {
-            double ref_loc_x = channels_ref[0].at<double>(kps_ref[j].pt.y,kps_ref[j].pt.x);
-            double ref_loc_y = channels_ref[1].at<double>(kps_ref[j].pt.y,kps_ref[j].pt.x);
+            double ref_loc_x = geo_img_ref[0].at<double>(kps_ref[j].pt.y,kps_ref[j].pt.x);
+            double ref_loc_y = geo_img_ref[1].at<double>(kps_ref[j].pt.y,kps_ref[j].pt.x);
 
             double geo_dist = sqrt( (loc_x-ref_loc_x)*(loc_x-ref_loc_x) + (loc_y-ref_loc_y)*(loc_y-ref_loc_y) );
             if (geo_dist<radius)
@@ -233,9 +229,9 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
 
         iter_num = iter_num + 1;
     }
-    cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+    // cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
     CorresID = CorresID_final;
-    cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+    // cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
   
     return CorresID;
 }
@@ -250,10 +246,10 @@ void FEAmatcher::ConsistentCheck(const Frame &SourceFrame, const Frame &TargetFr
 
     std::sort(scc_1.rbegin(), scc_1.rend());
     std::sort(scc_2.rbegin(), scc_2.rend());
-    for (size_t i = 0; i < 3; i++)
-        cout << "scc_1: " << scc_1[i].first << " " << scc_1[i].second << " " << abs(SourceFrame.norm_img.rows-TargetFrame.norm_img.rows) << endl;
-    for (size_t i = 0; i < 3; i++)
-        cout << "scc_2: " << scc_2[i].first << " " << scc_2[i].second << endl;
+    // for (size_t i = 0; i < 3; i++)
+    //     cout << "scc_1: " << scc_1[i].first << " " << scc_1[i].second << " " << abs(SourceFrame.norm_img.rows-TargetFrame.norm_img.rows) << endl;
+    // for (size_t i = 0; i < 3; i++)
+    //     cout << "scc_2: " << scc_2[i].first << " " << scc_2[i].second << endl;
     
     std::vector<cv::DMatch> TemperalMatches;
     int count = 0;
@@ -264,7 +260,7 @@ void FEAmatcher::ConsistentCheck(const Frame &SourceFrame, const Frame &TargetFr
     double kp_diff = abs(abs(scc_1[0].second-scc_2[0].second)-img_diff);
     if (kp_diff<=kp_diff_thres)
     {
-        cout << "kp_diff: " << kp_diff << endl;
+        // cout << "kp_diff: " << kp_diff << endl;
         for (size_t i = 0; i < CorresID_1.size(); i++)
         {
             if (CorresID_1[i]==-1)

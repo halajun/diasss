@@ -6,6 +6,7 @@
 #include "util.h"
 #include "frame.h"
 #include "FEAmatcher.h"
+#include "optimizer.h"
 #include "cxxopts.hpp"
 
 #include <opencv2/highgui/highgui.hpp>
@@ -83,7 +84,7 @@ int main(int argc, char** argv)
             FEAmatcher::RobustMatching(test_frames[i],test_frames[j]);
 
 
-
+    // --- optimize trajectory between images --- //
     Optimizer::TrajOptimizationPair(test_frames[0], test_frames[1]);
     
     

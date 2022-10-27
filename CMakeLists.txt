@@ -29,9 +29,13 @@ set(diasss_SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/core/frame.cpp
   ${PROJECT_SOURCE_DIR}/src/core/FEAmatcher.cpp
   ${PROJECT_SOURCE_DIR}/thirdparty/ORBextractor.cpp
+  ${PROJECT_SOURCE_DIR}/src/core/optimizer.cpp
+  ${PROJECT_SOURCE_DIR}/src/core/LMtriangulatefactor.cpp
 )
 
 add_library(diasss ${diasss_SOURCE_FILES})
+
+target_link_libraries(diasss gtsam)
 
 include_directories(
 	${UTILITIES_DIRS}
@@ -57,8 +61,7 @@ link_directories(
 add_executable(test_demo 
                src/diasss2.cpp)
 
-target_link_libraries(test_demo
-		diasss gtsam
+target_link_libraries(test_demo diasss
 		${OpenCV_LIBRARIES} ${Boost_LIBRARIES})
 # target_link_libraries(test_demo
 #                       diasss gsf_data xtf_data csv_data navi_data all_data 

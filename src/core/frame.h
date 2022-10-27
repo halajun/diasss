@@ -23,7 +23,7 @@ namespace Diasss
         cv::Mat GetNormalizeSSS(const cv::Mat &sss_raw_img);
         cv::Mat GetFilteredMask(const cv::Mat &sss_raw_img);
         void DetectFeature(const cv::Mat &img, const cv::Mat &mask, std::vector<cv::KeyPoint> &kps, cv::Mat &dst);
-        cv::Mat GetGeoImg(const int &row, const int &col, const cv::Mat &pose, const std::vector<double> &g_range);
+        std::vector<cv::Mat> GetGeoImg(const int &row, const int &col, const cv::Mat &pose, const std::vector<double> &g_range);
 
         // Initialization items
         int img_id;
@@ -32,11 +32,13 @@ namespace Diasss
         cv::Mat dr_poses;
         std::vector<double> altitudes;
         std::vector<double> ground_ranges;
+        std::vector<double> tf_stb;
+        std::vector<double> tf_port;
 
         // Produced items
         cv::Mat norm_img; // normalized image;
         cv::Mat flt_mask; // binary, mask for filtering area that could be ignored;
-        cv::Mat geo_img; // image geo-referenced location in x, y and z
+        std::vector<cv::Mat> geo_img; // image geo-referenced location in x, y and z
         std::vector<cv::KeyPoint> kps; // detected keypoints
         cv::Mat dst; // descriptors of detected keypoints
         cv::Mat corres_kps; // correspondences of keypoints. row: frame_id, ref_frame_id, kp_x, kp_y, kp_ref_x, kp_ref_y

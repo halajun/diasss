@@ -21,8 +21,8 @@ namespace Diasss
 
         static std::vector<int> GeoNearNeighSearch(const int &img_id, const int &img_id_ref,
                                                    const cv::Mat &img, const cv::Mat &img_ref,
-                                                   const std::vector<cv::KeyPoint> &kps, const cv::Mat &dst, const cv::Mat &geo_img,
-                                                   const std::vector<cv::KeyPoint> &kps_ref, const cv::Mat &dst_ref, const cv::Mat &geo_img_ref,
+                                                   const std::vector<cv::KeyPoint> &kps, const cv::Mat &dst, const std::vector<cv::Mat> &geo_img,
+                                                   const std::vector<cv::KeyPoint> &kps_ref, const cv::Mat &dst_ref, const std::vector<cv::Mat> &geo_img_ref,
                                                    std::vector<std::pair<int,double>> &scc);
 
         static void ConsistentCheck(const Frame &SourceFrame, const Frame &TargetFrame,

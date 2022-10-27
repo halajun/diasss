@@ -26,6 +26,9 @@ Frame::Frame(const int &id, const cv::Mat &mImg, const cv::Mat &mPose, const std
     ground_ranges = vGrange;
     img_id = id;
     anno_kps = mAnno;
+    tf_stb = {-3.119, -0.405, -0.146}; // sensor offset (starboard) ENU
+    tf_port = {-3.119, 0.405, -0.146}; // sensor offset (port) ENU
+
 
     // --- get normalized image --- //
     norm_img = GetNormalizeSSS(mImg);
@@ -108,12 +111,12 @@ cv::Mat Frame::GetFilteredMask(const cv::Mat &sss_raw_img)
     return output_mask;
 }
 
-cv::Mat Frame::GetGeoImg(const int &row, const int &col, const cv::Mat &pose, const std::vector<double> &g_range)
+std::vector<cv::Mat> Frame::GetGeoImg(const int &row, const int &col, const cv::Mat &pose, const std::vector<double> &g_range)
 {
     // initialize x y and z
     cv::Mat bin_loc_x = cv::Mat::zeros(row, col, CV_64FC1);
     cv::Mat bin_loc_y = cv::Mat::zeros(row, col, CV_64FC1);
-    cv::Mat bin_loc_z = cv::Mat::zeros(row, col, CV_64FC1);
+    // cv::Mat bin_loc_z = cv::Mat::zeros(row, col, CV_64FC1);
 
     for (int i = 0; i < row; i++)
     {
@@ -141,11 +144,11 @@ cv::Mat Frame::GetGeoImg(const int &row, const int &col, const cv::Mat &pose, co
 
     channels.push_back(bin_loc_x);
     channels.push_back(bin_loc_y);
-    channels.push_back(bin_loc_z);
+    // channels.push_back(bin_loc_z);
 
-    cv::merge(channels, output);
+    // cv::merge(channels, output);
 
-    return output;
+    return channels;
 }
 
 void Frame::DetectFeature(const cv::Mat &img, const cv::Mat &mask, std::vector<cv::KeyPoint> &kps, cv::Mat &dst)

@@ -115,3 +115,11 @@ test_data/annos-xml/SSH-0171.xml
 test_data/annos-xml/SSH-0172.xml
 test_data/annos-xml/SSH-0173.xml
 test_data/annos-xml/SSH-0174.xml
+build/.cmake/api/v1/reply/cache-v2-053451305a8bd1c28104.json
+build/.cmake/api/v1/reply/cmakeFiles-v1-ffb30d87b6c0f54c1d4d.json
+build/.cmake/api/v1/reply/codemodel-v2-7a4cbdc260d268c83c1b.json
+build/.cmake/api/v1/reply/index-2022-10-26T15-21-31-0549.json
+build/.cmake/api/v1/reply/target-diasss-a1419cdb84b6b7174c11.json
+build/.cmake/api/v1/reply/target-test_demo-5b19d67f3b413dad59ee.json
+build/CMakeFiles/diasss.dir/src/core/LMtriangulatefactor.cpp.o
+build/CMakeFiles/diasss.dir/src/core/optimizer.cpp.o
