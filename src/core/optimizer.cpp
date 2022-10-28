@@ -1,6 +1,7 @@
 
 #include <bits/stdc++.h>
 #include <iostream>
+#include <random>
 
 #include "optimizer.h"
 
@@ -17,7 +18,12 @@ using namespace gtsam;
 void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
 {
 
-    vector<Pose3> dr_poses;
+    // noise model paras for pose
+    double ro1_ = 0.01*PI/180, pi1_ = 0.01*PI/180, ya1_ = 0.1*PI/180, x1_ = 0.05, y1_ = 0.05, z1_ = 0.01;
+    double ro2_ = 0.01*PI/180, pi2_ = 0.01*PI/180, ya2_ = 0.1*PI/180, x2_ = 0.05, y2_ = 0.05, z2_ = 0.01;
+    // Noise model paras for keypoint
+    double sigma_r = 0.1, alpha_bw =0.1*PI/180;
+
 
     std::vector<Vector6> kps_pairs = Optimizer::GetKpsPairs(SourceFrame.anno_kps, SourceFrame.img_id, TargetFrame.img_id,
                                                      SourceFrame.altitudes,SourceFrame.ground_ranges,
@@ -29,6 +35,30 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
                                                                 SourceFrame.altitudes, TargetFrame.altitudes,
                                                                 SourceFrame.dr_poses, TargetFrame.dr_poses);
 
+    // --- Assign unique ID for each pose ---//
+    int id_tmp = 0;
+    std::vector<int> g_id_s(SourceFrame.dr_poses.rows), g_id_t(TargetFrame.dr_poses.rows), g_id_in_kps(kps_pairs.size());
+    for (size_t i = 0; i < SourceFrame.dr_poses.rows; i++)
+    {
+        g_id_s[i] = id_tmp;
+        id_tmp = id_tmp + 1;
+    }
+    for (size_t i = 0; i < TargetFrame.dr_poses.rows; i++)
+    {
+        g_id_t[i] = id_tmp;
+        id_tmp = id_tmp + 1;
+    }
+
+    // // record unique ID for each keypoint pair,
+    // // only the ID of second keypoint is recorded;
+    for (size_t i = 0; i < kps_pairs.size(); i++)
+    {
+        int ping_num = kps_pairs[i](3);
+        if (ping_num>=TargetFrame.dr_poses.rows)
+            cout << "!!! index out of range: " << ping_num << ">" << TargetFrame.dr_poses.rows << endl;      
+        g_id_in_kps[i] = g_id_t[ping_num];
+    }
+
 
     // Create an iSAM2 object.
     ISAM2Params parameters;
@@ -39,6 +69,152 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
     // Create a Factor Graph and Values to hold the new data
     NonlinearFactorGraph graph;
     Values initialEstimate;
+
+
+    // // --- loop on the poses of the SOURCE image --- // //
+    for (size_t i = 0; i < SourceFrame.dr_poses.rows; i++)
+    {
+        Pose3 pose_dr = Pose3(
+                Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(i,0),SourceFrame.dr_poses.at<double>(i,1),SourceFrame.dr_poses.at<double>(i,2)), 
+                Point3(SourceFrame.dr_poses.at<double>(i,3), SourceFrame.dr_poses.at<double>(i,4), SourceFrame.dr_poses.at<double>(i,5)));
+        
+        initialEstimate.insert(Symbol('X', g_id_s[i]), gtsam::Pose3::identity());
+
+        // if it's the first pose, add fixed prior factor
+        if (i==0)
+        {
+            auto PriorModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3::Constant(0.000001), Vector3::Constant(0.000001))
+                                                           .finished());
+            graph.addPrior(Symbol('X', g_id_s[i]), pose_dr, PriorModel);
+
+        }
+        // add odometry factor and update isam
+        else
+        {
+            Pose3 pose_dr_pre = Pose3(
+                    Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(i-1,0),SourceFrame.dr_poses.at<double>(i-1,1),SourceFrame.dr_poses.at<double>(i-1,2)), 
+                    Point3(SourceFrame.dr_poses.at<double>(i-1,3), SourceFrame.dr_poses.at<double>(i-1,4), SourceFrame.dr_poses.at<double>(i-1,5)));
+
+            auto odo = pose_dr_pre.between(pose_dr);
+
+            auto OdoModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro1_, pi1_, ya1_), Vector3(x1_, y1_, z1_))
+                                                           .finished());
+
+            graph.add(BetweenFactor<Pose3>(Symbol('X',g_id_s[i-1]), Symbol('X',g_id_s[i]), odo, OdoModel));
+
+            // Update iSAM with the new factors
+            isam.update(graph, initialEstimate);
+            // One more time
+            isam.update();
+            Values currentEstimate = isam.calculateEstimate();
+            // cout << "Updating Current Ping #" << g_id_s[i] << ": " << endl;
+            // cout << currentEstimate.at<Pose3>(Symbol('X',g_id_s[i])) << endl;
+
+            // Clear the factor graph and values for the next iteration
+            graph.resize(0);
+            initialEstimate.clear();
+        }
+          
+    }
+
+
+    // // --- loop on the poses of the TARGET image --- // //
+    for (size_t i = 0; i < TargetFrame.dr_poses.rows; i++)
+    {
+        Pose3 pose_dr = Pose3(
+                Rot3::Rodrigues(TargetFrame.dr_poses.at<double>(i,0),TargetFrame.dr_poses.at<double>(i,1),TargetFrame.dr_poses.at<double>(i,2)), 
+                Point3(TargetFrame.dr_poses.at<double>(i,3), TargetFrame.dr_poses.at<double>(i,4), TargetFrame.dr_poses.at<double>(i,5)));
+        
+        initialEstimate.insert(Symbol('X', g_id_t[i]), gtsam::Pose3::identity());
+
+
+        // // get the last pose from end of last image 
+        // // if it is the start pose in current image
+        if (i==0)
+        {
+            int id = SourceFrame.dr_poses.rows - 1;
+            Pose3 pose_dr_pre = Pose3(
+                    Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(id,0),SourceFrame.dr_poses.at<double>(id,1),SourceFrame.dr_poses.at<double>(id,2)), 
+                    Point3(SourceFrame.dr_poses.at<double>(id,3), SourceFrame.dr_poses.at<double>(id,4), SourceFrame.dr_poses.at<double>(id,5)));
+
+            auto odo = pose_dr_pre.between(pose_dr);
+
+            auto OdoModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro1_, pi1_, ya1_), Vector3(x1_, y1_, z1_))
+                                                            .finished());
+
+            graph.add(BetweenFactor<Pose3>(Symbol('X',g_id_s[id]), Symbol('X',g_id_t[i]), odo, OdoModel));
+        }
+        else
+        {
+            Pose3 pose_dr_pre = Pose3(
+                    Rot3::Rodrigues(TargetFrame.dr_poses.at<double>(i-1,0),TargetFrame.dr_poses.at<double>(i-1,1),TargetFrame.dr_poses.at<double>(i-1,2)), 
+                    Point3(TargetFrame.dr_poses.at<double>(i-1,3), TargetFrame.dr_poses.at<double>(i-1,4), TargetFrame.dr_poses.at<double>(i-1,5)));
+
+            auto odo = pose_dr_pre.between(pose_dr);
+
+            auto OdoModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro1_, pi1_, ya1_), Vector3(x1_, y1_, z1_))
+                                                            .finished());
+
+            graph.add(BetweenFactor<Pose3>(Symbol('X',g_id_t[i-1]), Symbol('X',g_id_t[i]), odo, OdoModel));
+        }
+
+
+        // check if current ping has keypoint measurement
+        int kps_id = -1;
+        for (size_t j = 0; j < g_id_in_kps.size(); j++)
+        {
+            if (g_id_in_kps[j]==g_id_t[i])
+            {
+                kps_id = j;
+                break;
+            }
+        }
+
+        // if keypoint measure found, construct factor and add to graph
+        if (kps_id!=-1)
+        {
+            cout << "Add New Keypoint Measurement ..." << endl;
+
+            // TODO
+            // specify what are required;
+            // modify SssPointFactor;
+            // have a good weekend;
+
+
+            // noise model
+            auto KP_NOISE_1 = noiseModel::Diagonal::Sigmas(Vector2(sigma_r,kps_pairs[i](2)*alpha_bw));
+            auto KP_NOISE_2 = noiseModel::Diagonal::Sigmas(Vector2(sigma_r,kps_pairs[i](5)*alpha_bw));
+
+            // add factor to graph
+            int id_s = kps_pairs[kps_id](0), id_t = kps_pairs[kps_id](3);
+            if (id_s>=SourceFrame.dr_poses.rows || id_t>=TargetFrame.dr_poses.rows)
+                cout << "row index out of range when adding to graph!!!" << endl;
+            // graph.add(SssPointFactor(Symbol('L',kps_id),Symbol('X',g_id_s[id_s]),Vector2(kps_pairs[kps_id](2),0),Ts_s,KP_NOISE_1));
+            // graph.add(SssPointFactor(Symbol('L',kps_id),Symbol('X',g_id_t[id_t]),Vector2(kps_pairs[kps_id](5),0),Ts_t,KP_NOISE_2));
+
+        }
+        
+        
+
+
+        // Update iSAM with the new factors
+        isam.update(graph, initialEstimate);
+        // One more time
+        isam.update();
+        Values currentEstimate = isam.calculateEstimate();
+        // cout << "Updating Current Ping #" << g_id_t[i] << ": " << endl;
+        // cout << currentEstimate.at<Pose3>(Symbol('X',g_id_t[i])) << endl;
+
+        // Clear the factor graph and values for the next iteration
+        graph.resize(0);
+        initialEstimate.clear();
+
+
+
+
+    }
+    
+    
 
 
 
@@ -132,6 +308,8 @@ vector<Point3> Optimizer::TriangulateLandmarks(const std::vector<Vector6> &kps_p
 
         // ping pose
         int id_s = kps_pairs[i](0), id_t = kps_pairs[i](3);
+        if (id_s>=dr_poses_s.rows || id_t>=dr_poses_t.rows)
+            cout << "row index out of range !!!" << endl;    
         Pose3 Tp_s = Pose3(Rot3::Rodrigues(dr_poses_s.at<double>(id_s,0), dr_poses_s.at<double>(id_s,1), dr_poses_s.at<double>(id_s,2)), 
                            Point3(dr_poses_s.at<double>(id_s,3), dr_poses_s.at<double>(id_s,4), dr_poses_s.at<double>(id_s,5)));
         Pose3 Tp_t = Pose3(Rot3::Rodrigues(dr_poses_t.at<double>(id_t,0), dr_poses_t.at<double>(id_t,1), dr_poses_t.at<double>(id_t,2)), 
@@ -147,6 +325,8 @@ vector<Point3> Optimizer::TriangulateLandmarks(const std::vector<Vector6> &kps_p
 
         // initialize point
         int id_ss = kps_pairs[i](1), id_tt = kps_pairs[i](4);
+        if (id_ss>=geo_s[0].cols || id_tt>=geo_t[0].cols)
+            cout << "column index out of range !!!" << endl;  
         double x_bar = (geo_s[0].at<double>(id_s,id_ss)+geo_t[0].at<double>(id_t,id_tt))/2;
         double y_bar = (geo_s[1].at<double>(id_s,id_ss)+geo_t[1].at<double>(id_t,id_tt))/2;
         double z_bar = ( (dr_poses_s.at<double>(id_s,5)-alts_s[id_s]) + (dr_poses_t.at<double>(id_t,5)-alts_t[id_t]) )/2;
