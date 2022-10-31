@@ -2,6 +2,7 @@
 #include <bits/stdc++.h>
 #include <iostream>
 #include <random>
+#include <math.h> 
 
 #include "optimizer.h"
 
@@ -170,40 +171,64 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
             }
         }
 
-        // if keypoint measure found, construct factor and add to graph
-        if (kps_id!=-1)
+        // --- if keypoint measure found, construct factor and add to graph --- //
+        bool add_point = 1;
+        if (kps_id!=-1 && add_point)
         {
-            cout << "Add New Keypoint Measurement ..." << endl;
+            cout << "Add New Keypoint Measurement: L" << kps_id << endl;
 
-            // TODO
-            // specify what are required;
-            // modify SssPointFactor;
-            // have a good weekend;
-
+            // sensor offset
+            int id_ss = kps_pairs[kps_id](1), id_tt = kps_pairs[kps_id](4);
+            if (id_ss>=SourceFrame.norm_img.cols || id_tt>=TargetFrame.norm_img.cols)
+                cout << "column index out of range !!! (in factor construction)" << endl;  
+            Pose3 Ts_s;
+            if (id_ss<SourceFrame.norm_img.cols/2)
+                Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(SourceFrame.tf_stb[0], SourceFrame.tf_stb[1], SourceFrame.tf_stb[2]));
+            else
+                Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(SourceFrame.tf_port[0], SourceFrame.tf_port[1], SourceFrame.tf_port[2]));
+            Pose3 Ts_t;
+            if (id_tt<TargetFrame.norm_img.cols/2)
+                Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(TargetFrame.tf_stb[0], TargetFrame.tf_stb[1], TargetFrame.tf_stb[2]));
+            else
+                Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(TargetFrame.tf_port[0], TargetFrame.tf_port[1], TargetFrame.tf_port[2]));       
 
             // noise model
-            auto KP_NOISE_1 = noiseModel::Diagonal::Sigmas(Vector2(sigma_r,kps_pairs[i](2)*alpha_bw));
-            auto KP_NOISE_2 = noiseModel::Diagonal::Sigmas(Vector2(sigma_r,kps_pairs[i](5)*alpha_bw));
+            auto KP_NOISE_1 = noiseModel::Diagonal::Sigmas(Vector2(sigma_r,kps_pairs[kps_id](2)*alpha_bw));
+            auto KP_NOISE_2 = noiseModel::Diagonal::Sigmas(Vector2(sigma_r,kps_pairs[kps_id](5)*alpha_bw));
 
             // add factor to graph
             int id_s = kps_pairs[kps_id](0), id_t = kps_pairs[kps_id](3);
             if (id_s>=SourceFrame.dr_poses.rows || id_t>=TargetFrame.dr_poses.rows)
                 cout << "row index out of range when adding to graph!!!" << endl;
-            // graph.add(SssPointFactor(Symbol('L',kps_id),Symbol('X',g_id_s[id_s]),Vector2(kps_pairs[kps_id](2),0),Ts_s,KP_NOISE_1));
-            // graph.add(SssPointFactor(Symbol('L',kps_id),Symbol('X',g_id_t[id_t]),Vector2(kps_pairs[kps_id](5),0),Ts_t,KP_NOISE_2));
+            // TODO: don't use kps_id for landmark unique ID, if it is not for pair image optimization but more;
+            // double theta = atan2(ini_points[kps_id].z()/ini_points[kps_id].y());
+            graph.add(SssPointFactor(Symbol('L',kps_id),Symbol('X',g_id_s[id_s]),Vector2(kps_pairs[kps_id](2),0.0),Ts_s,KP_NOISE_1));
+            graph.add(SssPointFactor(Symbol('L',kps_id),Symbol('X',g_id_t[id_t]),Vector2(kps_pairs[kps_id](5),0.0),Ts_t,KP_NOISE_2));
+
+            // add point prior factor
+            auto PointPriorModel = noiseModel::Diagonal::Sigmas(Vector3(1.0, 1.0, 1.0));
+            graph.addPrior(Symbol('L',kps_id), ini_points[kps_id], PointPriorModel);
+
+            // initialize keypoint
+            initialEstimate.insert(Symbol('L',kps_id), Point3(0.0, 0.0, 0.0));
 
         }
         
         
-
-
         // Update iSAM with the new factors
         isam.update(graph, initialEstimate);
         // One more time
         isam.update();
         Values currentEstimate = isam.calculateEstimate();
-        // cout << "Updating Current Ping #" << g_id_t[i] << ": " << endl;
-        // cout << currentEstimate.at<Pose3>(Symbol('X',g_id_t[i])) << endl;
+
+        cout << "Updating Current Ping #" << g_id_t[i] << ": " << endl;
+        if (kps_id!=-1 && add_point)
+        {
+            cout << "NEW POSE: " << endl << currentEstimate.at<Pose3>(Symbol('X',g_id_t[i])) << endl;
+            cout << "OLD POSE: " << endl << pose_dr << endl;
+            cout << "NEW POINT: " << endl << currentEstimate.at<Point3>(Symbol('L',kps_id)) << endl;
+            cout << "OLD POINT: " << endl << ini_points[kps_id] << endl;
+        }
 
         // Clear the factor graph and values for the next iteration
         graph.resize(0);
