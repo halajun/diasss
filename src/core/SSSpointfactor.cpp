@@ -9,8 +9,8 @@ namespace Diasss
 // @param T        the 6d pose in Pose3
 // @param H1,H2    the optional Jacobian matrixes, which use boost optional and has default null pointer
 gtsam::Vector SssPointFactor::evaluateError(const gtsam::Point3& p, const gtsam::Pose3& T,
-                            boost::optional<gtsam::Matrix&> H1,
-                            boost::optional<gtsam::Matrix&> H2) const {
+                                            boost::optional<gtsam::Matrix&> H1,
+                                            boost::optional<gtsam::Matrix&> H2) const {
 
     gtsam::Point3 p_s = Ts_.transformTo( T.transformTo(p) );
     gtsam::Vector3 ypr = T.rotation().ypr();
@@ -40,9 +40,9 @@ gtsam::Vector SssPointFactor::evaluateError(const gtsam::Point3& p, const gtsam:
     if (H2)
     {
         gtsam::Matrix3 block_t = -(Ts_.rotation().inverse()*T.rotation().inverse()).matrix();
-        gtsam::Vector3 col_4 = Ts_.rotation().inverse()*rot_dev_r.rotate(p_s-T.translation());
-        gtsam::Vector3 col_5 = Ts_.rotation().inverse()*rot_dev_p.rotate(p_s-T.translation());
-        gtsam::Vector3 col_6 = Ts_.rotation().inverse()*rot_dev_y.rotate(p_s-T.translation());
+        gtsam::Vector3 col_4 = Ts_.rotation().inverse()*rot_dev_r.rotate(p-T.translation());
+        gtsam::Vector3 col_5 = Ts_.rotation().inverse()*rot_dev_p.rotate(p-T.translation());
+        gtsam::Vector3 col_6 = Ts_.rotation().inverse()*rot_dev_y.rotate(p-T.translation());
         gtsam::Matrix36 J_s_pose =  (gtsam::Matrix36() <<   col_4(0),col_5(0),col_6(0),block_t(0,0),block_t(0,1),block_t(0,2),
                                                             col_4(1),col_5(1),col_6(1),block_t(1,0),block_t(1,1),block_t(1,2),
                                                             col_4(2),col_5(2),col_6(2),block_t(2,0),block_t(2,1),block_t(2,2)).finished();

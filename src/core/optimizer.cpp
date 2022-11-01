@@ -21,7 +21,7 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
 
     // noise model paras for pose
     double ro1_ = 0.01*PI/180, pi1_ = 0.01*PI/180, ya1_ = 0.1*PI/180, x1_ = 0.05, y1_ = 0.05, z1_ = 0.01;
-    double ro2_ = 0.01*PI/180, pi2_ = 0.01*PI/180, ya2_ = 0.1*PI/180, x2_ = 0.05, y2_ = 0.05, z2_ = 0.01;
+    double ro2_ = 0.01*PI/180, pi2_ = 0.01*PI/180, ya2_ = 0.01*PI/180, x2_ = 0.01, y2_ = 0.01, z2_ = 0.01;
     // Noise model paras for keypoint
     double sigma_r = 0.1, alpha_bw =0.1*PI/180;
 
@@ -200,17 +200,29 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
             int id_s = kps_pairs[kps_id](0), id_t = kps_pairs[kps_id](3);
             if (id_s>=SourceFrame.dr_poses.rows || id_t>=TargetFrame.dr_poses.rows)
                 cout << "row index out of range when adding to graph!!!" << endl;
-            // TODO: don't use kps_id for landmark unique ID, if it is not for pair image optimization but more;
-            // double theta = atan2(ini_points[kps_id].z()/ini_points[kps_id].y());
-            graph.add(SssPointFactor(Symbol('L',kps_id),Symbol('X',g_id_s[id_s]),Vector2(kps_pairs[kps_id](2),0.0),Ts_s,KP_NOISE_1));
+            // // TODO: don't use kps_id for landmark unique ID, if it is not for pair image optimization but more;
+            Pose3 Tp_s = Pose3(
+                    Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(id_s,0),SourceFrame.dr_poses.at<double>(id_s,1),SourceFrame.dr_poses.at<double>(id_s,2)), 
+                    Point3(SourceFrame.dr_poses.at<double>(id_s,3), SourceFrame.dr_poses.at<double>(id_s,4), SourceFrame.dr_poses.at<double>(id_s,5)));
+            graph.add(LMTriaFactor(Symbol('L',kps_id),Vector2(kps_pairs[kps_id](2),0.0),Ts_s,Tp_s,KP_NOISE_1));
+            // graph.add(SssPointFactor(Symbol('L',kps_id),Symbol('X',g_id_s[id_s]),Vector2(kps_pairs[kps_id](2),0.0),Ts_s,KP_NOISE_1));
             graph.add(SssPointFactor(Symbol('L',kps_id),Symbol('X',g_id_t[id_t]),Vector2(kps_pairs[kps_id](5),0.0),Ts_t,KP_NOISE_2));
 
+            // // add pose prior factor
+            // auto PosePriorModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro2_, pi2_, ya2_), Vector3(x2_, y2_, z2_))
+            //                                                .finished());
+            // Pose3 pose_dr_ref = Pose3(
+            //         Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(id_s,0),SourceFrame.dr_poses.at<double>(id_s,1),SourceFrame.dr_poses.at<double>(id_s,2)), 
+            //         Point3(SourceFrame.dr_poses.at<double>(id_s,3), SourceFrame.dr_poses.at<double>(id_s,4), SourceFrame.dr_poses.at<double>(id_s,5)));
+            // graph.addPrior(Symbol('X', g_id_s[id_s]), pose_dr_ref, PosePriorModel);
+
             // add point prior factor
-            auto PointPriorModel = noiseModel::Diagonal::Sigmas(Vector3(1.0, 1.0, 1.0));
+            double point_noise = 2.0;
+            auto PointPriorModel = noiseModel::Diagonal::Sigmas(Vector3(point_noise, point_noise, point_noise));
             graph.addPrior(Symbol('L',kps_id), ini_points[kps_id], PointPriorModel);
 
             // initialize keypoint
-            initialEstimate.insert(Symbol('L',kps_id), Point3(0.0, 0.0, 0.0));
+            initialEstimate.insert(Symbol('L',kps_id), Point3(0.0,0.0,0.0));
 
         }
         
@@ -224,8 +236,10 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
         cout << "Updating Current Ping #" << g_id_t[i] << ": " << endl;
         if (kps_id!=-1 && add_point)
         {
-            cout << "NEW POSE: " << endl << currentEstimate.at<Pose3>(Symbol('X',g_id_t[i])) << endl;
-            cout << "OLD POSE: " << endl << pose_dr << endl;
+            int id_s = kps_pairs[kps_id](0);
+            // cout << "NEW POSE 1: " << endl << currentEstimate.at<Pose3>(Symbol('X',g_id_s[id_s])) << endl;
+            cout << "NEW POSE 2: " << endl << currentEstimate.at<Pose3>(Symbol('X',g_id_t[i])) << endl;
+            cout << "OLD POSE 2: " << endl << pose_dr << endl;
             cout << "NEW POINT: " << endl << currentEstimate.at<Point3>(Symbol('L',kps_id)) << endl;
             cout << "OLD POINT: " << endl << ini_points[kps_id] << endl;
         }
@@ -285,7 +299,7 @@ std::vector<Vector6> Optimizer::GetKpsPairs(const cv::Mat &kps, const int &id_s,
 
             // for (size_t i = 0; i < kp_pair.size(); i++)
             //     cout << kp_pair(i) << " ";
-            // cout << endl;
+            // cout << gra_id_s << " " << gra_id_t << endl;
             
             kps_pairs.push_back(kp_pair);
 

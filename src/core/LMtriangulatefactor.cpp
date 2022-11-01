@@ -19,7 +19,7 @@ gtsam::Vector LMTriaFactor::evaluateError(const gtsam::Point3& p, boost::optiona
         gtsam::Vector3 row_1 = p_s.transpose()*J_s_kp.matrix()/gtsam::norm3(p_s);
         gtsam::Vector3 row_2 = ((gtsam::Vector3() << 1.0, 0.0, 0.0).finished()).transpose()*J_s_kp.matrix();
         *H = (gtsam::Matrix23() << row_1(0), row_1(1), row_1(2), 
-                                    row_2(0), row_2(1), row_2(2)).finished();
+                                   row_2(0), row_2(1), row_2(2)).finished();
     }
     
     // return error vector
