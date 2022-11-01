@@ -40,14 +40,14 @@ gtsam::Vector SssPointFactor::evaluateError(const gtsam::Point3& p, const gtsam:
     if (H2)
     {
         gtsam::Matrix3 block_t = -(Ts_.rotation().inverse()*T.rotation().inverse()).matrix();
-        gtsam::Vector3 col_4 = Ts_.rotation().inverse()*rot_dev_r.rotate(p-T.translation());
-        gtsam::Vector3 col_5 = Ts_.rotation().inverse()*rot_dev_p.rotate(p-T.translation());
-        gtsam::Vector3 col_6 = Ts_.rotation().inverse()*rot_dev_y.rotate(p-T.translation());
-        gtsam::Matrix36 J_s_pose =  (gtsam::Matrix36() <<   col_4(0),col_5(0),col_6(0),block_t(0,0),block_t(0,1),block_t(0,2),
-                                                            col_4(1),col_5(1),col_6(1),block_t(1,0),block_t(1,1),block_t(1,2),
-                                                            col_4(2),col_5(2),col_6(2),block_t(2,0),block_t(2,1),block_t(2,2)).finished();
-        gtsam::Vector6 row_1 = p_s.transpose()*J_s_pose.matrix()/gtsam::norm3(p_s);
-        gtsam::Vector6 row_2 = ((gtsam::Vector3() << 1.0, 0.0, 0.0).finished()).transpose()*J_s_pose.matrix();
+        gtsam::Vector3 col_4 = (Ts_.rotation().inverse()*rot_dev_r).rotate(p-T.translation());
+        gtsam::Vector3 col_5 = (Ts_.rotation().inverse()*rot_dev_p).rotate(p-T.translation());
+        gtsam::Vector3 col_6 = (Ts_.rotation().inverse()*rot_dev_y).rotate(p-T.translation());
+        gtsam::Matrix36 J_s_pose =  (gtsam::Matrix36() << col_4(0),col_5(0),col_6(0),block_t(0,0),block_t(0,1),block_t(0,2),
+                                                          col_4(1),col_5(1),col_6(1),block_t(1,0),block_t(1,1),block_t(1,2),
+                                                          col_4(2),col_5(2),col_6(2),block_t(2,0),block_t(2,1),block_t(2,2)).finished();
+        gtsam::Vector6 row_1 = p_s.transpose()*J_s_pose/gtsam::norm3(p_s);
+        gtsam::Vector6 row_2 = ((gtsam::Vector3() << 1.0, 0.0, 0.0).finished()).transpose()*J_s_pose;
         *H2 = (gtsam::Matrix26() << row_1(0), row_1(1), row_1(2), row_1(3), row_1(4), row_1(5), 
                                     row_2(0), row_2(1), row_2(2), row_2(3), row_2(4), row_2(5)).finished();
     }
