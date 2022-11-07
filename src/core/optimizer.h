@@ -2,6 +2,8 @@
 #ifndef OPTIMIZER_H
 #define OPTIMIZER_H
 
+#include <fstream>
+
 #include "frame.h"
 #include "SSSpointfactor.h"
 #include "LMtriangulatefactor.h"
@@ -14,9 +16,12 @@
 #include <gtsam/slam/BetweenFactor.h>
 
 #include <gtsam/nonlinear/ISAM2.h>
+#include <gtsam/nonlinear/NonlinearISAM.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
+#include <gtsam/nonlinear/GaussNewtonOptimizer.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
+#include <gtsam/nonlinear/Marginals.h>
 
 
 namespace Diasss
@@ -34,11 +39,18 @@ using namespace gtsam;
         // Trajectory optimization for a pair of side-scan waterfall images
         void static TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame);
 
-        std::vector<Vector6> static GetKpsPairs(const cv::Mat &kps, const int &id_s, const int &id_t,
+        std::vector<Vector6> static GetKpsPairs(const bool &USE_ANNO, const cv::Mat &kps, const int &id_s, const int &id_t,
                                          const std::vector<double> &alts_s, const std::vector<double> &gras_s,
                                          const std::vector<double> &alts_t, const std::vector<double> &gras_t);
 
         std::vector<Point3> static TriangulateLandmarks(const std::vector<Vector6> &kps_pairs, 
+                                                        const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
+                                                        const int &img_id_s, const int &img_id_t,
+                                                        const std::vector<cv::Mat> &geo_s, const std::vector<cv::Mat> &geo_t,
+                                                        const std::vector<double> &alts_s, const std::vector<double> &alts_t,
+                                                        const cv::Mat &dr_poses_s, const cv::Mat &dr_poses_t);
+
+        std::vector<pair<Pose3,Vector6>> static LoopClosingTFs(const std::vector<Vector6> &kps_pairs, 
                                                         const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
                                                         const int &img_id_s, const int &img_id_t,
                                                         const std::vector<cv::Mat> &geo_s, const std::vector<cv::Mat> &geo_t,
