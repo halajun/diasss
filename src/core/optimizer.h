@@ -3,6 +3,7 @@
 #define OPTIMIZER_H
 
 #include <fstream>
+#include <iomanip>
 
 #include "frame.h"
 #include "SSSpointfactor.h"
@@ -50,11 +51,17 @@ using namespace gtsam;
                                                         const std::vector<double> &alts_s, const std::vector<double> &alts_t,
                                                         const cv::Mat &dr_poses_s, const cv::Mat &dr_poses_t);
 
+        Point3 static TriangulateOneLandmark(const Vector6 &kps_pair, 
+                                             const Pose3 &Ts_s, const Pose3 &Ts_t,
+                                             const Pose3 &Tp_s, const Pose3 &Tp_t,
+                                             const Point3 &lm_ini);
+
         std::vector<pair<Pose3,Vector6>> static LoopClosingTFs(const std::vector<Vector6> &kps_pairs, 
                                                         const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
                                                         const int &img_id_s, const int &img_id_t,
                                                         const std::vector<cv::Mat> &geo_s, const std::vector<cv::Mat> &geo_t,
                                                         const std::vector<double> &alts_s, const std::vector<double> &alts_t,
+                                                        const std::vector<double> &gras_s, const std::vector<double> &gras_t,
                                                         const cv::Mat &dr_poses_s, const cv::Mat &dr_poses_t);
 
         

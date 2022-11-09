@@ -213,13 +213,13 @@ void Util::ShowAnnos(int &f1, int &f2, cv::Mat &img1, cv::Mat &img2, const cv::M
 
     // cout << "number of matched keypoints: " << count << endl;
 
-    // // --- demonstrate --- //
-    // cv::Mat img_matches;
-    // cv::drawMatches(img1, PreKeys, img2, CurKeys, TemperalMatches, img_matches, cv::Scalar::all(-1), cv::Scalar::all(-1),
-    //                 vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-    // cv::namedWindow("temperal matches", cv::WINDOW_NORMAL);
-    // cv::imshow("temperal matches", img_matches);
-    // cv::waitKey(0);
+    // --- demonstrate --- //
+    cv::Mat img_matches;
+    cv::drawMatches(img1, PreKeys, img2, CurKeys, TemperalMatches, img_matches, cv::Scalar::all(-1), cv::Scalar::all(-1),
+                    vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+    cv::namedWindow("temperal matches", cv::WINDOW_NORMAL);
+    cv::imshow("temperal matches", img_matches);
+    cv::waitKey(0);
 
     return;
 }

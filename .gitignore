@@ -128,3 +128,5 @@ build/.cmake/api/v1/reply/index-2022-10-31T10-34-12-0351.json
 build/.cmake/api/v1/reply/target-diasss-05a8a35931f341a2c4e9.json
 build/.cmake/api/v1/reply/target-test_demo-4d4828a32a7874136005.json
 build/CMakeFiles/diasss.dir/src/core/SSSpointfactor.cpp.o
+fnl_lm_errors.txt
+ini_lm_error.txt
