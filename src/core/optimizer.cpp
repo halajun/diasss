@@ -28,6 +28,10 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
     double ro2_ = 0.01*PI/180, pi2_ = 0.01*PI/180, ya2_ = 0.01*PI/180, x2_ = 0.01, y2_ = 0.01, z2_ = 0.01;
     // Noise model paras for keypoint
     double sigma_r = 0.1, alpha_bw =0.1*PI/180;
+    // random noise generator
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution(0.0,1.0);
+    double noise_xyz = 3, noise_rpy = 3*PI/180;
 
 
     std::vector<Vector6> kps_pairs = Optimizer::GetKpsPairs(USE_ANNO,SourceFrame.corres_kps,SourceFrame.img_id,TargetFrame.img_id,
@@ -91,8 +95,15 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
         Pose3 pose_dr = Pose3(
                 Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(i,0),SourceFrame.dr_poses.at<double>(i,1),SourceFrame.dr_poses.at<double>(i,2)), 
                 Point3(SourceFrame.dr_poses.at<double>(i,3), SourceFrame.dr_poses.at<double>(i,4), SourceFrame.dr_poses.at<double>(i,5)));
+
+        std::vector<double> seeds;
+        for (size_t j = 0; j < 6; j++)
+            seeds.push_back(distribution(generator));        
+        Pose3 add_noise(Rot3::Rodrigues(seeds[0]*noise_rpy, seeds[1]*noise_rpy, seeds[2]*noise_rpy),
+                        Point3(seeds[3]*noise_xyz, seeds[4]*noise_xyz, seeds[5]*noise_xyz));
         
-        initialEstimate.insert(Symbol('X', g_id_s[i]), gtsam::Pose3::identity());
+        initialEstimate.insert(Symbol('X', g_id_s[i]), pose_dr.compose(add_noise));
+        // initialEstimate.insert(Symbol('X', g_id_s[i]), gtsam::Pose3::identity());
 
         // if it's the first pose, add fixed prior factor
         if (i==0)
@@ -140,8 +151,15 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
         Pose3 pose_dr = Pose3(
                 Rot3::Rodrigues(TargetFrame.dr_poses.at<double>(i,0),TargetFrame.dr_poses.at<double>(i,1),TargetFrame.dr_poses.at<double>(i,2)), 
                 Point3(TargetFrame.dr_poses.at<double>(i,3), TargetFrame.dr_poses.at<double>(i,4), TargetFrame.dr_poses.at<double>(i,5)));
+
+        std::vector<double> seeds;
+        for (size_t j = 0; j < 6; j++)
+            seeds.push_back(distribution(generator));        
+        Pose3 add_noise(Rot3::Rodrigues(seeds[0]*noise_rpy, seeds[1]*noise_rpy, seeds[2]*noise_rpy),
+                        Point3(seeds[3]*noise_xyz, seeds[4]*noise_xyz, seeds[5]*noise_xyz));
         
-        initialEstimate.insert(Symbol('X', g_id_t[i]), gtsam::Pose3::identity());
+        initialEstimate.insert(Symbol('X', g_id_t[i]), pose_dr.compose(add_noise));
+        // initialEstimate.insert(Symbol('X', g_id_t[i]), gtsam::Pose3::identity());
 
 
         // // get the last pose from end of last image 
@@ -215,7 +233,7 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
         Values currentEstimate = isam.calculateEstimate();
 
         // Show results before and after optimization
-        bool printinfo = 1;
+        bool printinfo = 0;
         if (printinfo && kps_id!=-1 && ADD_LC)
         {
             int id_t = kps_pairs[kps_id](3);
@@ -233,6 +251,7 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
         initialEstimate.clear();
 
     }
+    cout << endl;
 
     Values FinalEstimate = isam.calculateEstimate();
 
@@ -730,14 +749,14 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &id_s, co
         
         
     }
-    
-    for (size_t i = 0; i < kps_pairs_est.size(); i++)
+
+    for (size_t i = 0; i < kps_pairs.size(); i++)
     {
         double x_dist, y_dist;
-        int id_s = kps_pairs_est[i](0), id_t = kps_pairs_est[i](3);
+        int id_s = kps_pairs[i](0), id_t = kps_pairs[i](2);
         if (id_s>=geo_s[0].rows || id_t>=geo_t[0].rows)
             cout << "row index out of range !!! (in evaluation)" << endl;  
-        int id_ss = kps_pairs_est[i](1), id_tt = kps_pairs_est[i](4);
+        int id_ss = kps_pairs[i](1), id_tt = kps_pairs[i](3);
         if (id_ss>=geo_s[0].cols || id_tt>=geo_t[0].cols)
             cout << "column index out of range !!! (in evaluation)" << endl;
 
@@ -750,29 +769,29 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &id_s, co
         double lm_geo_s_x, lm_geo_s_y, lm_geo_t_x, lm_geo_t_y;
 
         Pose3 new_pose_s = FinalEstimate.at<Pose3>(Symbol('X', g_id_s[id_s]));
-        if (kps_pairs_est[i](1)<geo_s[0].cols/2)
+        if (kps_pairs[i](1)<geo_s[0].cols/2)
         {
-            int gr_idx = geo_s[0].cols/2 - kps_pairs_est[i](1);
+            int gr_idx = geo_s[0].cols/2 - kps_pairs[i](1);
             lm_geo_s_x = new_pose_s.x() + gras_s[gr_idx]*cos(new_pose_s.rotation().yaw()+PI/2-PI);
             lm_geo_s_y = new_pose_s.y() + gras_s[gr_idx]*sin(new_pose_s.rotation().yaw()+PI/2-PI);
         }
         else
         {
-            int gr_idx = kps_pairs_est[i](1) - geo_s[0].cols/2;
+            int gr_idx = kps_pairs[i](1) - geo_s[0].cols/2;
             lm_geo_s_x = new_pose_s.x() + gras_s[gr_idx]*cos(new_pose_s.rotation().yaw()-PI/2-PI);
             lm_geo_s_y = new_pose_s.y() + gras_s[gr_idx]*sin(new_pose_s.rotation().yaw()-PI/2-PI);
         }
 
         Pose3 new_pose_t = FinalEstimate.at<Pose3>(Symbol('X', g_id_t[id_t]));
-        if (kps_pairs_est[i](4)<geo_t[0].cols/2)
+        if (kps_pairs[i](3)<geo_t[0].cols/2)
         {
-            int gr_idx = geo_t[0].cols/2 - kps_pairs_est[i](4);
+            int gr_idx = geo_t[0].cols/2 - kps_pairs[i](3);
             lm_geo_t_x = new_pose_t.x() + gras_t[gr_idx]*cos(new_pose_t.rotation().yaw()+PI/2-PI);
             lm_geo_t_y = new_pose_t.y() + gras_t[gr_idx]*sin(new_pose_t.rotation().yaw()+PI/2-PI);
         }
         else
         {
-            int gr_idx = kps_pairs_est[i](4) - geo_t[0].cols/2;
+            int gr_idx = kps_pairs[i](3) - geo_t[0].cols/2;
             lm_geo_t_x = new_pose_t.x() + gras_t[gr_idx]*cos(new_pose_t.rotation().yaw()-PI/2-PI);
             lm_geo_t_y = new_pose_t.y() + gras_t[gr_idx]*sin(new_pose_t.rotation().yaw()-PI/2-PI);
         }
@@ -787,65 +806,68 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &id_s, co
         }
 
     }
-
-    // for (size_t i = 0; i < kps_pairs.size(); i++)
-    // {
-    //     double x_dist, y_dist;
-    //     int id_s = kps_pairs[i](0), id_t = kps_pairs[i](2);
-    //     if (id_s>=geo_s[0].rows || id_t>=geo_t[0].rows)
-    //         cout << "row index out of range !!! (in evaluation)" << endl;  
-    //     int id_ss = kps_pairs[i](1), id_tt = kps_pairs[i](3);
-    //     if (id_ss>=geo_s[0].cols || id_tt>=geo_t[0].cols)
-    //         cout << "column index out of range !!! (in evaluation)" << endl;
-
-    //     // --- initial landmark distance observed between two dr ping poses --- //  
-    //     x_dist = (geo_s[0].at<double>(id_s,id_ss)-geo_t[0].at<double>(id_t,id_tt));
-    //     y_dist = (geo_s[1].at<double>(id_s,id_ss)-geo_t[1].at<double>(id_t,id_tt));
-    //     double ini_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);
-
-    //     // --- final landmark distance observed between two estimated ping poses --- //
-    //     double lm_geo_s_x, lm_geo_s_y, lm_geo_t_x, lm_geo_t_y;
-
-    //     Pose3 new_pose_s = FinalEstimate.at<Pose3>(Symbol('X', g_id_s[id_s]));
-    //     if (kps_pairs[i](1)<geo_s[0].cols/2)
-    //     {
-    //         int gr_idx = geo_s[0].cols/2 - kps_pairs[i](1);
-    //         lm_geo_s_x = new_pose_s.x() + gras_s[gr_idx]*cos(new_pose_s.rotation().yaw()+PI/2-PI);
-    //         lm_geo_s_y = new_pose_s.y() + gras_s[gr_idx]*sin(new_pose_s.rotation().yaw()+PI/2-PI);
-    //     }
-    //     else
-    //     {
-    //         int gr_idx = kps_pairs[i](1) - geo_s[0].cols/2;
-    //         lm_geo_s_x = new_pose_s.x() + gras_s[gr_idx]*cos(new_pose_s.rotation().yaw()-PI/2-PI);
-    //         lm_geo_s_y = new_pose_s.y() + gras_s[gr_idx]*sin(new_pose_s.rotation().yaw()-PI/2-PI);
-    //     }
-
-    //     Pose3 new_pose_t = FinalEstimate.at<Pose3>(Symbol('X', g_id_t[id_t]));
-    //     if (kps_pairs[i](3)<geo_t[0].cols/2)
-    //     {
-    //         int gr_idx = geo_t[0].cols/2 - kps_pairs[i](3);
-    //         lm_geo_t_x = new_pose_t.x() + gras_t[gr_idx]*cos(new_pose_t.rotation().yaw()+PI/2-PI);
-    //         lm_geo_t_y = new_pose_t.y() + gras_t[gr_idx]*sin(new_pose_t.rotation().yaw()+PI/2-PI);
-    //     }
-    //     else
-    //     {
-    //         int gr_idx = kps_pairs[i](3) - geo_t[0].cols/2;
-    //         lm_geo_t_x = new_pose_t.x() + gras_t[gr_idx]*cos(new_pose_t.rotation().yaw()-PI/2-PI);
-    //         lm_geo_t_y = new_pose_t.y() + gras_t[gr_idx]*sin(new_pose_t.rotation().yaw()-PI/2-PI);
-    //     }
-    //     x_dist = (lm_geo_s_x-lm_geo_t_x);
-    //     y_dist = (lm_geo_s_y-lm_geo_t_y);
-    //     double final_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);   
-
-    //     if (1)
-    //     {
-    //         cout << "lm distance (ini VS fnl) at SourcePing #" << id_s << " :" << ini_point_dist << " " << final_point_dist << " "
-    //             <<  final_point_dist-ini_point_dist << endl;
-    //     }
-
-    // }
     
+    bool show_est = 0;
+    if (show_est)
+    {
+        for (size_t i = 0; i < kps_pairs_est.size(); i++)
+        {
+            double x_dist, y_dist;
+            int id_s = kps_pairs_est[i](0), id_t = kps_pairs_est[i](3);
+            if (id_s>=geo_s[0].rows || id_t>=geo_t[0].rows)
+                cout << "row index out of range !!! (in evaluation)" << endl;  
+            int id_ss = kps_pairs_est[i](1), id_tt = kps_pairs_est[i](4);
+            if (id_ss>=geo_s[0].cols || id_tt>=geo_t[0].cols)
+                cout << "column index out of range !!! (in evaluation)" << endl;
 
+            // --- initial landmark distance observed between two dr ping poses --- //  
+            x_dist = (geo_s[0].at<double>(id_s,id_ss)-geo_t[0].at<double>(id_t,id_tt));
+            y_dist = (geo_s[1].at<double>(id_s,id_ss)-geo_t[1].at<double>(id_t,id_tt));
+            double ini_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);
+
+            // --- final landmark distance observed between two estimated ping poses --- //
+            double lm_geo_s_x, lm_geo_s_y, lm_geo_t_x, lm_geo_t_y;
+
+            Pose3 new_pose_s = FinalEstimate.at<Pose3>(Symbol('X', g_id_s[id_s]));
+            if (kps_pairs_est[i](1)<geo_s[0].cols/2)
+            {
+                int gr_idx = geo_s[0].cols/2 - kps_pairs_est[i](1);
+                lm_geo_s_x = new_pose_s.x() + gras_s[gr_idx]*cos(new_pose_s.rotation().yaw()+PI/2-PI);
+                lm_geo_s_y = new_pose_s.y() + gras_s[gr_idx]*sin(new_pose_s.rotation().yaw()+PI/2-PI);
+            }
+            else
+            {
+                int gr_idx = kps_pairs_est[i](1) - geo_s[0].cols/2;
+                lm_geo_s_x = new_pose_s.x() + gras_s[gr_idx]*cos(new_pose_s.rotation().yaw()-PI/2-PI);
+                lm_geo_s_y = new_pose_s.y() + gras_s[gr_idx]*sin(new_pose_s.rotation().yaw()-PI/2-PI);
+            }
+
+            Pose3 new_pose_t = FinalEstimate.at<Pose3>(Symbol('X', g_id_t[id_t]));
+            if (kps_pairs_est[i](4)<geo_t[0].cols/2)
+            {
+                int gr_idx = geo_t[0].cols/2 - kps_pairs_est[i](4);
+                lm_geo_t_x = new_pose_t.x() + gras_t[gr_idx]*cos(new_pose_t.rotation().yaw()+PI/2-PI);
+                lm_geo_t_y = new_pose_t.y() + gras_t[gr_idx]*sin(new_pose_t.rotation().yaw()+PI/2-PI);
+            }
+            else
+            {
+                int gr_idx = kps_pairs_est[i](4) - geo_t[0].cols/2;
+                lm_geo_t_x = new_pose_t.x() + gras_t[gr_idx]*cos(new_pose_t.rotation().yaw()-PI/2-PI);
+                lm_geo_t_y = new_pose_t.y() + gras_t[gr_idx]*sin(new_pose_t.rotation().yaw()-PI/2-PI);
+            }
+            x_dist = (lm_geo_s_x-lm_geo_t_x);
+            y_dist = (lm_geo_s_y-lm_geo_t_y);
+            double final_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);   
+
+            if (1)
+            {
+                cout << "lm distance (ini VS fnl) at SourcePing #" << id_s << " :" << ini_point_dist << " " << final_point_dist << " "
+                    <<  final_point_dist-ini_point_dist << endl;
+            }
+
+        }
+    }
+    
 
 
 
