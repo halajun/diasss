@@ -130,3 +130,5 @@ build/.cmake/api/v1/reply/target-test_demo-4d4828a32a7874136005.json
 build/CMakeFiles/diasss.dir/src/core/SSSpointfactor.cpp.o
 fnl_lm_errors.txt
 ini_lm_error.txt
+dr_poses.txt
+est_poses.txt

@@ -18,13 +18,13 @@ using namespace gtsam;
 
 void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
 {
-    bool USE_ANNO = 0, SHOW_IMG = 0; // use annotation or not (show image or not)
-    if (SHOW_IMG)
+    bool USE_ANNO = 0, SHOW_IMG = 0, ADD_LC = 1; // use annotation or not, show image or not, add loopclosure or not
+    if (USE_ANNO && SHOW_IMG)
         Util::ShowAnnos(SourceFrame.img_id,TargetFrame.img_id,SourceFrame.norm_img,TargetFrame.norm_img,
                         SourceFrame.anno_kps,TargetFrame.anno_kps);
 
     // Noise model paras for pose
-    double ro1_ = 0.01*PI/180, pi1_ = 0.01*PI/180, ya1_ = 0.1*PI/180, x1_ = 0.05, y1_ = 0.05, z1_ = 0.01;
+    double ro1_ = 0.01*PI/180, pi1_ = 0.01*PI/180, ya1_ = 0.05*PI/180, x1_ = 0.05, y1_ = 0.05, z1_ = 0.01;
     double ro2_ = 0.01*PI/180, pi2_ = 0.01*PI/180, ya2_ = 0.01*PI/180, x2_ = 0.01, y2_ = 0.01, z2_ = 0.01;
     // Noise model paras for keypoint
     double sigma_r = 0.1, alpha_bw =0.1*PI/180;
@@ -47,228 +47,202 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
                                                                        SourceFrame.ground_ranges, TargetFrame.ground_ranges,
                                                                        SourceFrame.dr_poses, TargetFrame.dr_poses);
 
-    // // --- Assign unique ID for each pose ---//
-    // int id_tmp = 0;
-    // std::vector<int> g_id_s(SourceFrame.dr_poses.rows), g_id_t(TargetFrame.dr_poses.rows);
-    // for (size_t i = 0; i < SourceFrame.dr_poses.rows; i++)
-    // {
-    //     g_id_s[i] = id_tmp;
-    //     id_tmp = id_tmp + 1;
-    // }
-    // for (size_t i = 0; i < TargetFrame.dr_poses.rows; i++)
-    // {
-    //     g_id_t[i] = id_tmp;
-    //     id_tmp = id_tmp + 1;
-    // }
-    // cout << "Total number of pings and keypoint pairs: " << id_tmp << " " << kps_pairs.size() << endl;
+    // --- Assign unique ID for each pose ---//
+    int id_tmp = 0;
+    std::vector<int> g_id_s(SourceFrame.dr_poses.rows), g_id_t(TargetFrame.dr_poses.rows), g_id_in_kps(kps_pairs.size());;
+    for (size_t i = 0; i < SourceFrame.dr_poses.rows; i++)
+    {
+        g_id_s[i] = id_tmp;
+        id_tmp = id_tmp + 1;
+    }
+    for (size_t i = 0; i < TargetFrame.dr_poses.rows; i++)
+    {
+        g_id_t[i] = id_tmp;
+        id_tmp = id_tmp + 1;
+    }
+    // // record unique ID for each keypoint pair,
+    // // only the ID of second keypoint is recorded;
+    for (size_t i = 0; i < kps_pairs.size(); i++)
+    {
+        int ping_num = kps_pairs[i](3);
+        if (ping_num>=TargetFrame.dr_poses.rows)
+            cout << "!!! index out of range: " << ping_num << ">" << TargetFrame.dr_poses.rows << endl;      
+        g_id_in_kps[i] = g_id_t[ping_num];
+    }
+    cout << "Total number of pings and keypoint pairs: " << id_tmp << " " << kps_pairs.size() << endl;
 
-    // // Create an iSAM2 object.
-    // ISAM2Params parameters;
-    // parameters.relinearizeThreshold = 0.1;
-    // parameters.relinearizeSkip = 10;
-    // parameters.factorization = ISAM2Params::QR;
-    // // parameters.optimizationParams = ISAM2DoglegParams();
-    // parameters.print();
-    // ISAM2 isam(parameters);
+    // Create an iSAM2 object.
+    ISAM2Params parameters;
+    parameters.relinearizeThreshold = 0.01;
+    parameters.relinearizeSkip = 1;
+    parameters.factorization = ISAM2Params::QR;
+    // parameters.optimizationParams = ISAM2DoglegParams();
+    parameters.print();
+    ISAM2 isam(parameters);
 
-    // // int relinearizeInterval = 3;
-    // // NonlinearISAM isam(relinearizeInterval);
+    // Create a Factor Graph and Values to hold the new data
+    NonlinearFactorGraph graph;
+    // NonlinearFactorGraph graphSAVE;
+    Values initialEstimate;
 
-    // // Create a Factor Graph and Values to hold the new data
-    // NonlinearFactorGraph graph;
-    // // NonlinearFactorGraph graphSAVE;
-    // Values initialEstimate;
-
-
-    // // // --- loop on the poses of the SOURCE image --- // //
-    // for (size_t i = 0; i < SourceFrame.dr_poses.rows; i++)
-    // {
-    //     Pose3 pose_dr = Pose3(
-    //             Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(i,0),SourceFrame.dr_poses.at<double>(i,1),SourceFrame.dr_poses.at<double>(i,2)), 
-    //             Point3(SourceFrame.dr_poses.at<double>(i,3), SourceFrame.dr_poses.at<double>(i,4), SourceFrame.dr_poses.at<double>(i,5)));
+    // // --- loop on the poses of the SOURCE image --- // //
+    for (size_t i = 0; i < SourceFrame.dr_poses.rows; i++)
+    {
+        Pose3 pose_dr = Pose3(
+                Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(i,0),SourceFrame.dr_poses.at<double>(i,1),SourceFrame.dr_poses.at<double>(i,2)), 
+                Point3(SourceFrame.dr_poses.at<double>(i,3), SourceFrame.dr_poses.at<double>(i,4), SourceFrame.dr_poses.at<double>(i,5)));
         
-    //     initialEstimate.insert(Symbol('X', g_id_s[i]), gtsam::Pose3::identity());
+        initialEstimate.insert(Symbol('X', g_id_s[i]), gtsam::Pose3::identity());
 
-    //     // if it's the first pose, add fixed prior factor
-    //     if (i==0)
-    //     {
-    //         auto PriorModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3::Constant(0.000001), Vector3::Constant(0.000001))
-    //                                                        .finished());
-    //         graph.addPrior(Symbol('X', g_id_s[i]), pose_dr, PriorModel);
-    //         // graphSAVE.addPrior(Symbol('X', g_id_s[i]), pose_dr, PriorModel);
+        // if it's the first pose, add fixed prior factor
+        if (i==0)
+        {
+            auto PriorModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3::Constant(0.000001), Vector3::Constant(0.000001))
+                                                           .finished());
+            graph.addPrior(Symbol('X', g_id_s[i]), pose_dr, PriorModel);
+            // graphSAVE.addPrior(Symbol('X', g_id_s[i]), pose_dr, PriorModel);
 
-    //     }
-    //     // add odometry factor and update isam
-    //     else
-    //     {
-    //         Pose3 pose_dr_pre = Pose3(
-    //                 Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(i-1,0),SourceFrame.dr_poses.at<double>(i-1,1),SourceFrame.dr_poses.at<double>(i-1,2)), 
-    //                 Point3(SourceFrame.dr_poses.at<double>(i-1,3), SourceFrame.dr_poses.at<double>(i-1,4), SourceFrame.dr_poses.at<double>(i-1,5)));
+        }
+        // add odometry factor and update isam
+        else
+        {
+            Pose3 pose_dr_pre = Pose3(
+                    Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(i-1,0),SourceFrame.dr_poses.at<double>(i-1,1),SourceFrame.dr_poses.at<double>(i-1,2)), 
+                    Point3(SourceFrame.dr_poses.at<double>(i-1,3), SourceFrame.dr_poses.at<double>(i-1,4), SourceFrame.dr_poses.at<double>(i-1,5)));
 
-    //         auto odo = pose_dr_pre.between(pose_dr);
+            auto odo = pose_dr_pre.between(pose_dr);
 
-    //         auto OdoModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro1_, pi1_, ya1_), Vector3(x1_, y1_, z1_))
-    //                                                        .finished());
+            auto OdoModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro1_, pi1_, ya1_), Vector3(x1_, y1_, z1_))
+                                                           .finished());
 
-    //         graph.add(BetweenFactor<Pose3>(Symbol('X',g_id_s[i-1]), Symbol('X',g_id_s[i]), odo, OdoModel));
-    //         // graphSAVE.add(BetweenFactor<Pose3>(Symbol('X',g_id_s[i-1]), Symbol('X',g_id_s[i]), odo, OdoModel));
+            graph.add(BetweenFactor<Pose3>(Symbol('X',g_id_s[i-1]), Symbol('X',g_id_s[i]), odo, OdoModel));
+            // graphSAVE.add(BetweenFactor<Pose3>(Symbol('X',g_id_s[i-1]), Symbol('X',g_id_s[i]), odo, OdoModel));
 
-    //         // Update iSAM with the new factors
-    //         isam.update(graph, initialEstimate);
-    //         // One more time
-    //         isam.update();
-    //         Values currentEstimate = isam.calculateEstimate();
-    //         // Values currentEstimate = isam.estimate();
-    //         // cout << "Updating Current Ping #" << g_id_s[i] << ": " << endl;
-    //         // cout << currentEstimate.at<Pose3>(Symbol('X',g_id_s[i])) << endl;
+            // Update iSAM with the new factors
+            isam.update(graph, initialEstimate);
+            // One more time
+            isam.update();
+            Values currentEstimate = isam.calculateEstimate();
+            // cout << "Updating Current Ping #" << g_id_s[i] << ": " << endl;
+            // cout << currentEstimate.at<Pose3>(Symbol('X',g_id_s[i])).translation() << endl;
 
-    //         // Clear the factor graph and values for the next iteration
-    //         graph.resize(0);
-    //         initialEstimate.clear();
-    //     }
+            // Clear the factor graph and values for the next iteration
+            graph.resize(0);
+            initialEstimate.clear();
+        }
           
-    // }
+    }
 
 
-    // // // --- loop on the poses of the TARGET image --- // //
-    // for (size_t i = 0; i < TargetFrame.dr_poses.rows; i++)
-    // {
-    //     Pose3 pose_dr = Pose3(
-    //             Rot3::Rodrigues(TargetFrame.dr_poses.at<double>(i,0),TargetFrame.dr_poses.at<double>(i,1),TargetFrame.dr_poses.at<double>(i,2)), 
-    //             Point3(TargetFrame.dr_poses.at<double>(i,3), TargetFrame.dr_poses.at<double>(i,4), TargetFrame.dr_poses.at<double>(i,5)));
+    // // --- loop on the poses of the TARGET image --- // //
+    for (size_t i = 0; i < TargetFrame.dr_poses.rows; i++)
+    {
+        Pose3 pose_dr = Pose3(
+                Rot3::Rodrigues(TargetFrame.dr_poses.at<double>(i,0),TargetFrame.dr_poses.at<double>(i,1),TargetFrame.dr_poses.at<double>(i,2)), 
+                Point3(TargetFrame.dr_poses.at<double>(i,3), TargetFrame.dr_poses.at<double>(i,4), TargetFrame.dr_poses.at<double>(i,5)));
         
-    //     initialEstimate.insert(Symbol('X', g_id_t[i]), gtsam::Pose3::identity());
+        initialEstimate.insert(Symbol('X', g_id_t[i]), gtsam::Pose3::identity());
 
 
-    //     // // get the last pose from end of last image 
-    //     // // if it is the start pose in current image
-    //     if (i==0)
-    //     {
-    //         int id = SourceFrame.dr_poses.rows - 1;
-    //         Pose3 pose_dr_pre = Pose3(
-    //                 Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(id,0),SourceFrame.dr_poses.at<double>(id,1),SourceFrame.dr_poses.at<double>(id,2)), 
-    //                 Point3(SourceFrame.dr_poses.at<double>(id,3), SourceFrame.dr_poses.at<double>(id,4), SourceFrame.dr_poses.at<double>(id,5)));
+        // // get the last pose from end of last image 
+        // // if it is the start pose in current image
+        if (i==0)
+        {
+            int id = SourceFrame.dr_poses.rows - 1;
+            Pose3 pose_dr_pre = Pose3(
+                    Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(id,0),SourceFrame.dr_poses.at<double>(id,1),SourceFrame.dr_poses.at<double>(id,2)), 
+                    Point3(SourceFrame.dr_poses.at<double>(id,3), SourceFrame.dr_poses.at<double>(id,4), SourceFrame.dr_poses.at<double>(id,5)));
 
-    //         auto odo = pose_dr_pre.between(pose_dr);
+            auto odo = pose_dr_pre.between(pose_dr);
 
-    //         auto OdoModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro1_, pi1_, ya1_), Vector3(x1_, y1_, z1_))
-    //                                                         .finished());
+            auto OdoModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro1_, pi1_, ya1_), Vector3(x1_, y1_, z1_))
+                                                            .finished());
 
-    //         graph.add(BetweenFactor<Pose3>(Symbol('X',g_id_s[id]), Symbol('X',g_id_t[i]), odo, OdoModel));
-    //         // graphSAVE.add(BetweenFactor<Pose3>(Symbol('X',g_id_s[id]), Symbol('X',g_id_t[i]), odo, OdoModel));
-    //     }
-    //     else
-    //     {
-    //         Pose3 pose_dr_pre = Pose3(
-    //                 Rot3::Rodrigues(TargetFrame.dr_poses.at<double>(i-1,0),TargetFrame.dr_poses.at<double>(i-1,1),TargetFrame.dr_poses.at<double>(i-1,2)), 
-    //                 Point3(TargetFrame.dr_poses.at<double>(i-1,3), TargetFrame.dr_poses.at<double>(i-1,4), TargetFrame.dr_poses.at<double>(i-1,5)));
+            graph.add(BetweenFactor<Pose3>(Symbol('X',g_id_s[id]), Symbol('X',g_id_t[i]), odo, OdoModel));
+        }
+        else
+        {
+            Pose3 pose_dr_pre = Pose3(
+                    Rot3::Rodrigues(TargetFrame.dr_poses.at<double>(i-1,0),TargetFrame.dr_poses.at<double>(i-1,1),TargetFrame.dr_poses.at<double>(i-1,2)), 
+                    Point3(TargetFrame.dr_poses.at<double>(i-1,3), TargetFrame.dr_poses.at<double>(i-1,4), TargetFrame.dr_poses.at<double>(i-1,5)));
 
-    //         auto odo = pose_dr_pre.between(pose_dr);
+            auto odo = pose_dr_pre.between(pose_dr);
 
-    //         auto OdoModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro1_, pi1_, ya1_), Vector3(x1_, y1_, z1_))
-    //                                                         .finished());
+            auto OdoModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro1_, pi1_, ya1_), Vector3(x1_, y1_, z1_))
+                                                            .finished());
 
-    //         graph.add(BetweenFactor<Pose3>(Symbol('X',g_id_t[i-1]), Symbol('X',g_id_t[i]), odo, OdoModel));
-    //         // graphSAVE.add(BetweenFactor<Pose3>(Symbol('X',g_id_t[i-1]), Symbol('X',g_id_t[i]), odo, OdoModel));
-    //     }       
+            graph.add(BetweenFactor<Pose3>(Symbol('X',g_id_t[i-1]), Symbol('X',g_id_t[i]), odo, OdoModel));
+
+        } 
+
+        // check if current ping has loop closing measurement
+        int kps_id = -1;
+        for (size_t j = 0; j < g_id_in_kps.size(); j++)
+        {
+            if (g_id_in_kps[j]==g_id_t[i])
+            {
+                kps_id = j;
+                break;
+            }
+        }
+
+        // --- if loop closing measurement found, construct factor and add to graph --- //
+        if (kps_id!=-1 && ADD_LC)
+        {
+            cout << "***********************************************************" << endl;
+            cout << "Add New Loop Closure Constraint" << " ";
+            cout << "between X" << g_id_s[(int)kps_pairs[kps_id](0)] << " and X" << g_id_t[(int)kps_pairs[kps_id](3)] << " ";
+            cout << "(" << kps_pairs[kps_id](0) << " and " << kps_pairs[kps_id](3) << ")" << endl;
+
+            // loop closure uncertainty model
+            auto LoopClosureNoiseModel = gtsam::noiseModel::Diagonal::Variances(lc_tf_Conv[kps_id].second);
+
+            // add loop closure measurement
+            Pose3 lc_tf = lc_tf_Conv[kps_id].first;
+
+            // add fator to graph
+            int id_s = kps_pairs[kps_id](0), id_t = kps_pairs[kps_id](3);
+            if (id_s>=SourceFrame.dr_poses.rows || id_t>=TargetFrame.dr_poses.rows)
+                cout << "row index out of range !!! (when add lc constrain...)" << endl; 
+            graph.add(BetweenFactor<Pose3>(Symbol('X',g_id_s[id_s]), Symbol('X',g_id_t[id_t]), lc_tf, LoopClosureNoiseModel));
+
+        }      
         
-    //     // Update iSAM with the new factors
-    //     isam.update(graph, initialEstimate);
-    //     // One more time
-    //     isam.update();
-    //     Values currentEstimate = isam.calculateEstimate();
-    //     // Values currentEstimate = isam.estimate();
+        // Update iSAM with the new factors
+        isam.update(graph, initialEstimate);
+        // One more time
+        isam.update();
+        Values currentEstimate = isam.calculateEstimate();
 
-    //     // Clear the factor graph and values for the next iteration
-    //     graph.resize(0);
-    //     initialEstimate.clear();
+        // Show results before and after optimization
+        bool printinfo = 1;
+        if (printinfo && kps_id!=-1 && ADD_LC)
+        {
+            int id_t = kps_pairs[kps_id](3);
+            cout << "NEW POSE 2: " << endl << currentEstimate.at<Pose3>(Symbol('X',g_id_t[id_t])).translation() << endl;
+            cout << "OLD POSE 2: " << endl << pose_dr.translation() << endl;
+        }
+        else if (0)
+        {
+            cout << "Updating Current Ping #" << g_id_t[i] << ": " << endl;
+            cout << currentEstimate.at<Pose3>(Symbol('X',g_id_t[i])).translation() << endl;
+        }
 
-    // }
+        // Clear the factor graph and values for the next iteration
+        graph.resize(0);
+        initialEstimate.clear();
 
-    // Values DRonlyEstimate = isam.calculateEstimate();
-    // // ofstream DRonly_optimized_dot_file("../DRonlyOptimizedGraph.dot");
-    // // graphSAVE.saveGraph(DRonly_optimized_dot_file, DRonlyEstimate);
+    }
 
+    Values FinalEstimate = isam.calculateEstimate();
 
-    // // // --- loop on the keypoint pairs measurements --- // //
-    // int step_size = 1;
-    // for (size_t i = 0; i < kps_pairs.size(); i=i+step_size)
-    // {
-    //     cout << "***********************************************************" << endl;
-    //     cout << "Add New KP Measurement: L" << i << " ";
-    //     cout << "between X" << g_id_s[(int)kps_pairs[i](0)] << " and X" << g_id_t[(int)kps_pairs[i](3)] << " ";
-    //     cout << "(" << kps_pairs[i](0) << " and " << kps_pairs[i](3) << ")" << endl;
-
-    //     // initialize keypoint
-    //     // initialEstimate.insert(Symbol('L',i), Point3(0.0,0.0,0.0));
-    //     initialEstimate.insert(Symbol('L',i), ini_points[i]);
-
-    //     // sensor offset
-    //     int id_ss = kps_pairs[i](1), id_tt = kps_pairs[i](4);
-    //     if (id_ss>=SourceFrame.norm_img.cols || id_tt>=TargetFrame.norm_img.cols)
-    //         cout << "column index out of range !!! (in factor construction)" << endl;  
-    //     Pose3 Ts_s;
-    //     if (id_ss<SourceFrame.norm_img.cols/2)
-    //         Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(SourceFrame.tf_stb[0], SourceFrame.tf_stb[1], SourceFrame.tf_stb[2]));
-    //     else
-    //         Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(SourceFrame.tf_port[0], SourceFrame.tf_port[1], SourceFrame.tf_port[2]));
-    //     Pose3 Ts_t;
-    //     if (id_tt<TargetFrame.norm_img.cols/2)
-    //         Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(TargetFrame.tf_stb[0], TargetFrame.tf_stb[1], TargetFrame.tf_stb[2]));
-    //     else
-    //         Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(TargetFrame.tf_port[0], TargetFrame.tf_port[1], TargetFrame.tf_port[2]));       
-
-    //     // noise model
-    //     auto KP_NOISE_1 = noiseModel::Diagonal::Sigmas(Vector2(sigma_r,kps_pairs[i](2)*alpha_bw));
-    //     auto KP_NOISE_2 = noiseModel::Diagonal::Sigmas(Vector2(sigma_r,kps_pairs[i](5)*alpha_bw));
-
-    //     // add factor to graph
-    //     int id_s = kps_pairs[i](0), id_t = kps_pairs[i](3);
-    //     if (id_s>=SourceFrame.dr_poses.rows || id_t>=TargetFrame.dr_poses.rows)
-    //         cout << "row index out of range when adding to graph!!!" << endl;
-    //     // // TODO: don't use kps_id for landmark unique ID, if it is not for pair image optimization but more;
-    //     Pose3 Tp_s = DRonlyEstimate.at<Pose3>(Symbol('X',g_id_s[id_s]));
-    //     // Pose3 Tp_s = Pose3(
-    //     //         Rot3::Rodrigues(SourceFrame.dr_poses.at<double>(id_s,0),SourceFrame.dr_poses.at<double>(id_s,1),SourceFrame.dr_poses.at<double>(id_s,2)), 
-    //     //         Point3(SourceFrame.dr_poses.at<double>(id_s,3), SourceFrame.dr_poses.at<double>(id_s,4), SourceFrame.dr_poses.at<double>(id_s,5)));
-    //     graph.add(LMTriaFactor(Symbol('L',i),Vector2(kps_pairs[i](2),0.0),Ts_s,Tp_s,KP_NOISE_1));
-    //     // graph.add(SssPointFactor(Symbol('L',i),Symbol('X',g_id_s[id_s]),Vector2(kps_pairs[i](2),0.0),Ts_s,KP_NOISE_1));
-    //     graph.add(SssPointFactor(Symbol('L',i),Symbol('X',g_id_t[id_t]),Vector2(kps_pairs[i](5),0.0),Ts_t,KP_NOISE_2));
-
-    //     // Update iSAM with the new factors
-    //     isam.update(graph, initialEstimate);
-    //     // One more time
-    //     isam.update();
-    //     Values currentEstimate = isam.calculateEstimate();
-    //     // Values currentEstimate = isam.estimate();
-
-    //     // Show results before and after optimization
-    //     bool printinfo = 1;
-    //     if (printinfo)
-    //     {
-    //         cout << "Updating Current Ping #" << g_id_t[id_t] << ": " << endl;
-
-    //         cout << "NEW POSE 2: " << endl << currentEstimate.at<Pose3>(Symbol('X',g_id_t[id_t])) << endl;
-    //         Pose3 pose_dr = Pose3(
-    //             Rot3::Rodrigues(TargetFrame.dr_poses.at<double>(id_t,0),TargetFrame.dr_poses.at<double>(id_t,1),TargetFrame.dr_poses.at<double>(id_t,2)), 
-    //             Point3(TargetFrame.dr_poses.at<double>(id_t,3), TargetFrame.dr_poses.at<double>(id_t,4), TargetFrame.dr_poses.at<double>(id_t,5)));
-    //         cout << "OLD POSE 2: " << endl << pose_dr << endl;
-    //         cout << "NEW POINT: " << endl << currentEstimate.at<Point3>(Symbol('L',i)) << endl;
-    //         cout << "OLD POINT: " << endl << ini_points[i] << endl << endl;
-    //     }
-
-    //     // Clear the factor graph and values for the next iteration
-    //     graph.resize(0);
-    //     initialEstimate.clear();
-
-
-
-    // }
-    
-    
-    
-
-
+    Optimizer::SaveTrajactoryPair(FinalEstimate,g_id_s,g_id_t,SourceFrame.dr_poses,TargetFrame.dr_poses);
+    Optimizer::EvaluateByAnnos(FinalEstimate,SourceFrame.img_id,TargetFrame.img_id,
+                               g_id_s,g_id_t,
+                               SourceFrame.geo_img,TargetFrame.geo_img,
+                               SourceFrame.ground_ranges,TargetFrame.ground_ranges,
+                               SourceFrame.anno_kps,TargetFrame.anno_kps,
+                               kps_pairs);
 
 
 }
@@ -424,7 +398,7 @@ std::vector<pair<Pose3,Vector6>>  Optimizer::LoopClosingTFs(const std::vector<Ve
             graph.addPrior(Symbol('X', 1), Tp_s, PosePriorModel);    
 
             // add odometry factor to graph      
-            double ro_ = 0.1*PI/180, pi_ = 0.1*PI/180, ya_ = 2.0*PI/180, x_ = abs(Tp_st.x()*2), y_ = abs(Tp_st.y()/10), z_ = 0.5;
+            double ro_ = 0.1*PI/180, pi_ = 0.1*PI/180, ya_ = 1.5*PI/180, x_ = abs(Tp_st.x()*2), y_ = abs(Tp_st.y()/10), z_ = 0.5;
             auto OdometryNoiseModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro_, pi_, ya_), Vector3(x_, y_, z_))
                                                             .finished());
             graph.add(BetweenFactor<Pose3>(Symbol('X',1), Symbol('X',2), Tp_st, OdometryNoiseModel));
@@ -472,8 +446,8 @@ std::vector<pair<Pose3,Vector6>>  Optimizer::LoopClosingTFs(const std::vector<Ve
             cout << "***********************************************************" << endl;
             cout << "Add New KP Measurement: L" << i << " ";
             cout << "between ping " << kps_pairs[i](0) << " and " << kps_pairs[i](3) << " " << endl;
-            cout << "NEW POSE: " << endl << new_pose.translation() << endl;
-            cout << "OLD POSE: " << endl << Tp_t.translation() << endl;
+            // cout << "NEW POSE: " << endl << new_pose.translation() << endl;
+            // cout << "OLD POSE: " << endl << Tp_t.translation() << endl;
             // cout << "INI POSE: " << endl << (Tp_t.compose(add_noise)).translation() << endl;
         }
 
@@ -518,25 +492,6 @@ std::vector<pair<Pose3,Vector6>>  Optimizer::LoopClosingTFs(const std::vector<Ve
             save_result_2 << final_point_dist << endl;
 
         }
-
-        bool eval_2 = 0;
-        if (eval_2)
-        {
-            int id_ss = kps_pairs[i](1), id_tt = kps_pairs[i](4);
-            if (id_ss>=geo_s[0].cols || id_tt>=geo_t[0].cols)
-                cout << "column index out of range !!!" << endl;  
-            double x_bar = (geo_s[0].at<double>(id_s,id_ss)+geo_t[0].at<double>(id_t,id_tt))/2;
-            double y_bar = (geo_s[1].at<double>(id_s,id_ss)+geo_t[1].at<double>(id_t,id_tt))/2;
-            double z_bar = ( (dr_poses_s.at<double>(id_s,5)-alts_s[id_s]) + (dr_poses_t.at<double>(id_t,5)-alts_t[id_t]) )/2;
-
-            Point3 point_dr = Optimizer::TriangulateOneLandmark(kps_pairs[i],Ts_s,Ts_t,Tp_s,Tp_t,Point3(x_bar, y_bar, z_bar));
-
-            Point3 point_est = Optimizer::TriangulateOneLandmark(kps_pairs[i],Ts_s,Ts_t,Tp_s,
-                                                                 result.at<Pose3>(Symbol('X', 2)),Point3(x_bar, y_bar, z_bar));
-
-        }
-        
-        
 
         Marginals marginals(graph, result, Marginals::QR);
 
@@ -666,6 +621,236 @@ vector<Point3> Optimizer::TriangulateLandmarks(const std::vector<Vector6> &kps_p
 
     return output_point;
 
+}
+
+void Optimizer::SaveTrajactoryPair(const Values &FinalEstimate, 
+                                   const std::vector<int> &g_id_s, const std::vector<int> &g_id_t,
+                                   const cv::Mat &dr_poses_s, const cv::Mat &dr_poses_t)
+{
+
+    // --- Save dead-reckoning results --- //
+
+    ofstream save_result_1;
+    string path1 = "../dr_poses.txt";
+    save_result_1.open(path1.c_str(),ios::trunc);
+
+    for (size_t i = 0; i < dr_poses_s.rows; i++)
+    {
+        Pose3 save_pose = Pose3(
+                Rot3::Rodrigues(dr_poses_s.at<double>(i,0),dr_poses_s.at<double>(i,1),dr_poses_s.at<double>(i,2)), 
+                Point3(dr_poses_s.at<double>(i,3), dr_poses_s.at<double>(i,4), dr_poses_s.at<double>(i,5)));
+        save_result_1 << fixed << setprecision(9) << save_pose.rotation().quaternion()(1) << " " << save_pose.rotation().quaternion()(2) << " "
+                      << save_pose.rotation().quaternion()(3) << " " << save_pose.rotation().quaternion()(0) << " " << save_pose.x() << " " 
+                      << save_pose.y() << " " << save_pose.z() << endl;
+    }
+    for (size_t i = 0; i < dr_poses_t.rows; i++)
+    {
+        Pose3 save_pose = Pose3(
+                Rot3::Rodrigues(dr_poses_t.at<double>(i,0),dr_poses_t.at<double>(i,1),dr_poses_t.at<double>(i,2)), 
+                Point3(dr_poses_t.at<double>(i,3), dr_poses_t.at<double>(i,4), dr_poses_t.at<double>(i,5)));
+        save_result_1 << fixed << setprecision(9) << save_pose.rotation().quaternion()(1) << " " << save_pose.rotation().quaternion()(2) << " "
+                      << save_pose.rotation().quaternion()(3) << " " << save_pose.rotation().quaternion()(0) << " " << save_pose.x() << " " 
+                      << save_pose.y() << " " << save_pose.z() << endl;
+    }
+
+    save_result_1.close();
+
+    // --- Save optimized results --- //
+
+    ofstream save_result_2;
+    string path2 = "../est_poses.txt";
+    save_result_2.open(path2.c_str(),ios::trunc);   
+
+    for (size_t i = 0; i < g_id_s.size(); i++)
+    {
+        Pose3 save_pose = FinalEstimate.at<Pose3>(Symbol('X',g_id_s[i]));
+        save_result_2 << fixed << setprecision(9) << save_pose.rotation().quaternion()(1) << " " << save_pose.rotation().quaternion()(2) << " "
+                      << save_pose.rotation().quaternion()(3) << " " << save_pose.rotation().quaternion()(0) << " " << save_pose.x() << " " 
+                      << save_pose.y() << " " << save_pose.z() << endl;
+        
+    }
+    for (size_t i = 0; i < g_id_t.size(); i++)
+    {
+        Pose3 save_pose = FinalEstimate.at<Pose3>(Symbol('X',g_id_t[i]));
+        save_result_2 << fixed << setprecision(9) << save_pose.rotation().quaternion()(1) << " " << save_pose.rotation().quaternion()(2) << " "
+                      << save_pose.rotation().quaternion()(3) << " " << save_pose.rotation().quaternion()(0) << " " << save_pose.x() << " " 
+                      << save_pose.y() << " " << save_pose.z() << endl;
+        
+    }
+     
+    save_result_2.close();
+
+
+    return;
+}
+
+void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &id_s, const int &id_t,
+                                const std::vector<int> &g_id_s, const std::vector<int> &g_id_t,
+                                const std::vector<cv::Mat> &geo_s, const std::vector<cv::Mat> &geo_t,
+                                const std::vector<double> &gras_s, const std::vector<double> &gras_t,
+                                const cv::Mat &anno_kps_s, const cv::Mat &anno_kps_t,
+                                const std::vector<Vector6> &kps_pairs_est)
+{
+
+    // -- get all the keypoint pairs --- //
+    std::vector<Vector4> kps_pairs;
+    std::vector<bool> close_to_est(anno_kps_s.rows,false);
+    int close_thres = 15;
+    for (size_t i = 0; i < anno_kps_s.rows; i++)
+    {
+        // decide which frame id is the target (associated) frame
+        int id_check;
+        std::vector<int> kp_s, kp_t;
+        id_check = anno_kps_s.at<int>(i,1);
+        kp_s = {anno_kps_s.at<int>(i,2),anno_kps_s.at<int>(i,3)};
+        kp_t = {anno_kps_s.at<int>(i,4),anno_kps_s.at<int>(i,5)};
+
+        // save keypoint pairs
+        if (id_check==id_t)
+        {
+            Vector4 kp_pair = (gtsam::Vector4() << kp_s[0], kp_s[1], kp_t[0], kp_t[1]).finished();
+            kps_pairs.push_back(kp_pair);
+
+            // for (size_t i = 0; i < kp_pair.size(); i++)
+            //     cout << kp_pair(i) << " ";
+            // cout << endl;
+
+        }
+
+        // check whether this pair is close to any of the estimated correspondences
+        for (size_t j = 0; j < kps_pairs_est.size(); j++)
+        {
+            int id_est = kps_pairs_est[j](0);
+            if (abs(id_est-kp_s[0])<close_thres)
+            {
+                close_to_est[i]=true;
+                break;
+            }     
+        }
+        
+        
+    }
+    
+    for (size_t i = 0; i < kps_pairs_est.size(); i++)
+    {
+        double x_dist, y_dist;
+        int id_s = kps_pairs_est[i](0), id_t = kps_pairs_est[i](3);
+        if (id_s>=geo_s[0].rows || id_t>=geo_t[0].rows)
+            cout << "row index out of range !!! (in evaluation)" << endl;  
+        int id_ss = kps_pairs_est[i](1), id_tt = kps_pairs_est[i](4);
+        if (id_ss>=geo_s[0].cols || id_tt>=geo_t[0].cols)
+            cout << "column index out of range !!! (in evaluation)" << endl;
+
+        // --- initial landmark distance observed between two dr ping poses --- //  
+        x_dist = (geo_s[0].at<double>(id_s,id_ss)-geo_t[0].at<double>(id_t,id_tt));
+        y_dist = (geo_s[1].at<double>(id_s,id_ss)-geo_t[1].at<double>(id_t,id_tt));
+        double ini_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);
+
+        // --- final landmark distance observed between two estimated ping poses --- //
+        double lm_geo_s_x, lm_geo_s_y, lm_geo_t_x, lm_geo_t_y;
+
+        Pose3 new_pose_s = FinalEstimate.at<Pose3>(Symbol('X', g_id_s[id_s]));
+        if (kps_pairs_est[i](1)<geo_s[0].cols/2)
+        {
+            int gr_idx = geo_s[0].cols/2 - kps_pairs_est[i](1);
+            lm_geo_s_x = new_pose_s.x() + gras_s[gr_idx]*cos(new_pose_s.rotation().yaw()+PI/2-PI);
+            lm_geo_s_y = new_pose_s.y() + gras_s[gr_idx]*sin(new_pose_s.rotation().yaw()+PI/2-PI);
+        }
+        else
+        {
+            int gr_idx = kps_pairs_est[i](1) - geo_s[0].cols/2;
+            lm_geo_s_x = new_pose_s.x() + gras_s[gr_idx]*cos(new_pose_s.rotation().yaw()-PI/2-PI);
+            lm_geo_s_y = new_pose_s.y() + gras_s[gr_idx]*sin(new_pose_s.rotation().yaw()-PI/2-PI);
+        }
+
+        Pose3 new_pose_t = FinalEstimate.at<Pose3>(Symbol('X', g_id_t[id_t]));
+        if (kps_pairs_est[i](4)<geo_t[0].cols/2)
+        {
+            int gr_idx = geo_t[0].cols/2 - kps_pairs_est[i](4);
+            lm_geo_t_x = new_pose_t.x() + gras_t[gr_idx]*cos(new_pose_t.rotation().yaw()+PI/2-PI);
+            lm_geo_t_y = new_pose_t.y() + gras_t[gr_idx]*sin(new_pose_t.rotation().yaw()+PI/2-PI);
+        }
+        else
+        {
+            int gr_idx = kps_pairs_est[i](4) - geo_t[0].cols/2;
+            lm_geo_t_x = new_pose_t.x() + gras_t[gr_idx]*cos(new_pose_t.rotation().yaw()-PI/2-PI);
+            lm_geo_t_y = new_pose_t.y() + gras_t[gr_idx]*sin(new_pose_t.rotation().yaw()-PI/2-PI);
+        }
+        x_dist = (lm_geo_s_x-lm_geo_t_x);
+        y_dist = (lm_geo_s_y-lm_geo_t_y);
+        double final_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);   
+
+        if (1)
+        {
+            cout << "lm distance (ini VS fnl) at SourcePing #" << id_s << " :" << ini_point_dist << " " << final_point_dist << " "
+                <<  final_point_dist-ini_point_dist << endl;
+        }
+
+    }
+
+    // for (size_t i = 0; i < kps_pairs.size(); i++)
+    // {
+    //     double x_dist, y_dist;
+    //     int id_s = kps_pairs[i](0), id_t = kps_pairs[i](2);
+    //     if (id_s>=geo_s[0].rows || id_t>=geo_t[0].rows)
+    //         cout << "row index out of range !!! (in evaluation)" << endl;  
+    //     int id_ss = kps_pairs[i](1), id_tt = kps_pairs[i](3);
+    //     if (id_ss>=geo_s[0].cols || id_tt>=geo_t[0].cols)
+    //         cout << "column index out of range !!! (in evaluation)" << endl;
+
+    //     // --- initial landmark distance observed between two dr ping poses --- //  
+    //     x_dist = (geo_s[0].at<double>(id_s,id_ss)-geo_t[0].at<double>(id_t,id_tt));
+    //     y_dist = (geo_s[1].at<double>(id_s,id_ss)-geo_t[1].at<double>(id_t,id_tt));
+    //     double ini_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);
+
+    //     // --- final landmark distance observed between two estimated ping poses --- //
+    //     double lm_geo_s_x, lm_geo_s_y, lm_geo_t_x, lm_geo_t_y;
+
+    //     Pose3 new_pose_s = FinalEstimate.at<Pose3>(Symbol('X', g_id_s[id_s]));
+    //     if (kps_pairs[i](1)<geo_s[0].cols/2)
+    //     {
+    //         int gr_idx = geo_s[0].cols/2 - kps_pairs[i](1);
+    //         lm_geo_s_x = new_pose_s.x() + gras_s[gr_idx]*cos(new_pose_s.rotation().yaw()+PI/2-PI);
+    //         lm_geo_s_y = new_pose_s.y() + gras_s[gr_idx]*sin(new_pose_s.rotation().yaw()+PI/2-PI);
+    //     }
+    //     else
+    //     {
+    //         int gr_idx = kps_pairs[i](1) - geo_s[0].cols/2;
+    //         lm_geo_s_x = new_pose_s.x() + gras_s[gr_idx]*cos(new_pose_s.rotation().yaw()-PI/2-PI);
+    //         lm_geo_s_y = new_pose_s.y() + gras_s[gr_idx]*sin(new_pose_s.rotation().yaw()-PI/2-PI);
+    //     }
+
+    //     Pose3 new_pose_t = FinalEstimate.at<Pose3>(Symbol('X', g_id_t[id_t]));
+    //     if (kps_pairs[i](3)<geo_t[0].cols/2)
+    //     {
+    //         int gr_idx = geo_t[0].cols/2 - kps_pairs[i](3);
+    //         lm_geo_t_x = new_pose_t.x() + gras_t[gr_idx]*cos(new_pose_t.rotation().yaw()+PI/2-PI);
+    //         lm_geo_t_y = new_pose_t.y() + gras_t[gr_idx]*sin(new_pose_t.rotation().yaw()+PI/2-PI);
+    //     }
+    //     else
+    //     {
+    //         int gr_idx = kps_pairs[i](3) - geo_t[0].cols/2;
+    //         lm_geo_t_x = new_pose_t.x() + gras_t[gr_idx]*cos(new_pose_t.rotation().yaw()-PI/2-PI);
+    //         lm_geo_t_y = new_pose_t.y() + gras_t[gr_idx]*sin(new_pose_t.rotation().yaw()-PI/2-PI);
+    //     }
+    //     x_dist = (lm_geo_s_x-lm_geo_t_x);
+    //     y_dist = (lm_geo_s_y-lm_geo_t_y);
+    //     double final_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);   
+
+    //     if (1)
+    //     {
+    //         cout << "lm distance (ini VS fnl) at SourcePing #" << id_s << " :" << ini_point_dist << " " << final_point_dist << " "
+    //             <<  final_point_dist-ini_point_dist << endl;
+    //     }
+
+    // }
+    
+
+
+
+
+
+    return;
 }
 
 

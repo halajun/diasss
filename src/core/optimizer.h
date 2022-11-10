@@ -64,6 +64,17 @@ using namespace gtsam;
                                                         const std::vector<double> &gras_s, const std::vector<double> &gras_t,
                                                         const cv::Mat &dr_poses_s, const cv::Mat &dr_poses_t);
 
+        void static SaveTrajactoryPair(const Values &FinalEstimate, 
+                                       const std::vector<int> &g_id_s, const std::vector<int> &g_id_t,
+                                       const cv::Mat &dr_poses_s, const cv::Mat &dr_poses_t);
+
+        void static EvaluateByAnnos(const Values &FinalEstimate, const int &id_s, const int &id_t,
+                                    const std::vector<int> &g_id_s, const std::vector<int> &g_id_t,
+                                    const std::vector<cv::Mat> &geo_s, const std::vector<cv::Mat> &geo_t,
+                                    const std::vector<double> &gras_s, const std::vector<double> &gras_t,
+                                    const cv::Mat &anno_kps_s, const cv::Mat &anno_kps_t,
+                                    const std::vector<Vector6> &kps_pairs_est);
+
         
 
     };
