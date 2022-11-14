@@ -40,6 +40,8 @@ using namespace gtsam;
         // Trajectory optimization for a pair of side-scan waterfall images
         void static TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame);
 
+        void static TrajOptimizationAll(std::vector<Frame> &AllFrames);
+
         std::vector<Vector6> static GetKpsPairs(const bool &USE_ANNO, const cv::Mat &kps, const int &id_s, const int &id_t,
                                          const std::vector<double> &alts_s, const std::vector<double> &gras_s,
                                          const std::vector<double> &alts_t, const std::vector<double> &gras_t);
@@ -56,7 +58,7 @@ using namespace gtsam;
                                              const Pose3 &Tp_s, const Pose3 &Tp_t,
                                              const Point3 &lm_ini);
 
-        std::vector<pair<Pose3,Vector6>> static LoopClosingTFs(const std::vector<Vector6> &kps_pairs, 
+        std::vector<tuple<Pose3,Vector6,double>> static LoopClosingTFs(const std::vector<Vector6> &kps_pairs, 
                                                         const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
                                                         const int &img_id_s, const int &img_id_t,
                                                         const std::vector<cv::Mat> &geo_s, const std::vector<cv::Mat> &geo_t,
@@ -68,12 +70,21 @@ using namespace gtsam;
                                        const std::vector<int> &g_id_s, const std::vector<int> &g_id_t,
                                        const cv::Mat &dr_poses_s, const cv::Mat &dr_poses_t);
 
-        void static EvaluateByAnnos(const Values &FinalEstimate, const int &id_s, const int &id_t,
+        void static SaveTrajactoryAll(const Values &FinalEstimate, const std::vector<std::vector<int>> &unique_id,
+                                      const std::vector<cv::Mat> &dr_poses_all);
+
+        void static EvaluateByAnnos(const Values &FinalEstimate, const int &img_id_s, const int &img_id_t,
                                     const std::vector<int> &g_id_s, const std::vector<int> &g_id_t,
                                     const std::vector<cv::Mat> &geo_s, const std::vector<cv::Mat> &geo_t,
                                     const std::vector<double> &gras_s, const std::vector<double> &gras_t,
                                     const cv::Mat &anno_kps_s, const cv::Mat &anno_kps_t,
                                     const std::vector<Vector6> &kps_pairs_est);
+
+        void static EvaluateByAnnosAll(const Values &FinalEstimate, const std::vector<std::vector<int>> &unique_id,
+                                       const std::vector<std::vector<cv::Mat>> &geo_img_all,
+                                       const std::vector<std::vector<double>> &gras_all,
+                                       const std::vector<std::vector<Vector6>> &kps_pairs_all,
+                                       const std::vector<pair<int,int>> &img_pairs_ids);
 
         
 
