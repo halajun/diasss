@@ -74,8 +74,10 @@ int main(int argc, char** argv)
                         vmImgs,vmPoses,vvAltts,vvGranges,vmAnnos);
 
     // --- construct frame --- //
+    // int test_num = vmImgs.size();
+    int test_num = 2;
     std::vector<Frame> test_frames;
-    for (size_t i = 0; i < vmImgs.size(); i++)
+    for (size_t i = 0; i < test_num; i++)
         test_frames.push_back(Frame(i,vmImgs[i],vmPoses[i],vvAltts[i],vvGranges[i],vmAnnos[i]));
 
     // --- find correspondences between each pair of frames --- //
