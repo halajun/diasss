@@ -21,7 +21,7 @@ using namespace gtsam;
 void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
 {
     // use annotation or not, add loopclosure or not
-    bool USE_ANNO = 1, ADD_LC = 1;
+    bool USE_ANNO = 0, ADD_LC = 1;
     // Noise model paras for pose
     double ro1_ = 0.01*PI/180, pi1_ = 0.01*PI/180, ya1_ = 0.05*PI/180, x1_ = 0.05, y1_ = 0.05, z1_ = 0.01;
     // random noise generator
@@ -612,7 +612,6 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
 
     Pose3 cps_pose = gtsam::Pose3::identity();
     if (img_id_s%2!=img_id_t%2)
-        // cps_pose = gtsam::Pose3::identity();
         cps_pose = Pose3(Rot3::Rodrigues(0.0, 0.0, PI), Point3(0.0,0.0,0.0));
     
 

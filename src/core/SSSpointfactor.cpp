@@ -40,15 +40,16 @@ gtsam::Vector SssPointFactor::evaluateError(const gtsam::Point3& p, const gtsam:
     if (H2)
     {
         bool plan_a = 0;
-        // 
         gtsam::Matrix3 block_t;
         gtsam::Matrix36 J_s_pose;
         if (plan_a)
         {
-            block_t = -(Ts_.rotation().inverse()).matrix();
-            gtsam::Matrix3 block_r = (gtsam::Matrix3() << 0.0, -p_s.z(), p_s.y(),
-                                                          p_s.z(), 0.0, -p_s.x(),
-                                                          -p_s.y(), p_s.x(), 0.0).finished();
+            block_t = -(Ts_.rotation().inverse()*T.rotation().inverse()).matrix();
+            gtsam::Point3 p_m = T.transformTo(p);
+            gtsam::Matrix3 m_x = (gtsam::Matrix3() << 0.0, -p_m.z(), p_m.y(),
+                                                       p_m.z(), 0.0, -p_m.x(),
+                                                       -p_m.y(), p_m.x(), 0.0).finished();
+            gtsam::Matrix3 block_r = Ts_.rotation().inverse().matrix()*m_x;
             J_s_pose =  (gtsam::Matrix36() << block_r(0,0),block_r(0,1),block_r(0,2),block_t(0,0),block_t(0,1),block_t(0,2),
                                               block_r(1,0),block_r(1,1),block_r(1,2),block_t(1,0),block_t(1,1),block_t(1,2),
                                               block_r(2,0),block_r(2,1),block_r(2,2),block_t(2,0),block_t(2,1),block_t(2,2)).finished();
