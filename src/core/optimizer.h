@@ -17,9 +17,9 @@
 #include <gtsam/slam/BetweenFactor.h>
 
 #include <gtsam/nonlinear/ISAM2.h>
-#include <gtsam/nonlinear/NonlinearISAM.h>
+// #include <gtsam/nonlinear/NonlinearISAM.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
-#include <gtsam/nonlinear/GaussNewtonOptimizer.h>
+// #include <gtsam/nonlinear/GaussNewtonOptimizer.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/Values.h>
 #include <gtsam/nonlinear/Marginals.h>
@@ -84,7 +84,10 @@ using namespace gtsam;
                                        const std::vector<std::vector<cv::Mat>> &geo_img_all,
                                        const std::vector<std::vector<double>> &gras_all,
                                        const std::vector<std::vector<Vector6>> &kps_pairs_all,
-                                       const std::vector<pair<int,int>> &img_pairs_ids);
+                                       const std::vector<pair<int,int>> &img_pairs_ids,
+                                       const std::vector<cv::Mat> &dr_poses_all,
+                                       const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
+                                       const std::vector<std::vector<double>> &alts_all);
 
         
 

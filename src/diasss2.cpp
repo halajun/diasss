@@ -75,7 +75,7 @@ int main(int argc, char** argv)
 
     // --- construct frame --- //
     int test_num = vmImgs.size();
-    // int test_num = 2;
+    // int test_num = 3;
     std::vector<Frame> test_frames;
     for (size_t i = 0; i < test_num; i++)
         test_frames.push_back(Frame(i,vmImgs[i],vmPoses[i],vvAltts[i],vvGranges[i],vmAnnos[i]));
@@ -87,7 +87,7 @@ int main(int argc, char** argv)
 
 
     // --- optimize trajectory between images --- //
-    // Optimizer::TrajOptimizationPair(test_frames[0], test_frames[1]);
+    // Optimizer::TrajOptimizationPair(test_frames[0], test_frames[2]);
     Optimizer::TrajOptimizationAll(test_frames);
     
     

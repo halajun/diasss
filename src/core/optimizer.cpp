@@ -265,11 +265,12 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
 
     // --- Evaluated with annotated keypoints --- //
     std::vector<std::vector<cv::Mat>> geo_img_all;
-    std::vector<std::vector<double>> gras_all;
+    std::vector<std::vector<double>> gras_all, alts_all;
     for (size_t i = 0; i < AllFrames.size(); i++)
     {
         geo_img_all.push_back(AllFrames[i].geo_img); 
         gras_all.push_back(AllFrames[i].ground_ranges);
+        alts_all.push_back(AllFrames[i].altitudes);
     }
     std::vector<std::vector<Vector6>> anno_kps_pairs_all;
     for (size_t i = 0; i < AllFrames.size(); i++)
@@ -283,7 +284,10 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
             anno_kps_pairs_all.push_back(kps_pairs);         
         }      
     }
-    Optimizer::EvaluateByAnnosAll(FinalEstimate,unique_id,geo_img_all,gras_all,anno_kps_pairs_all,img_pairs_ids);
+    Optimizer::EvaluateByAnnosAll(FinalEstimate,unique_id,geo_img_all,gras_all,
+                                  anno_kps_pairs_all,img_pairs_ids,dr_poses_all,
+                                  AllFrames[0].tf_stb, AllFrames[0].tf_port,
+                                  alts_all);
 
 
 
@@ -293,9 +297,9 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
 void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
 {
     bool USE_ANNO = 0, SHOW_IMG = 0, ADD_LC = 1; // use annotation or not, show image or not, add loopclosure or not
-    if (USE_ANNO && SHOW_IMG)
+    if (SHOW_IMG)
         Util::ShowAnnos(SourceFrame.img_id,TargetFrame.img_id,SourceFrame.norm_img,TargetFrame.norm_img,
-                        SourceFrame.anno_kps,TargetFrame.anno_kps);
+                        SourceFrame.corres_kps,TargetFrame.anno_kps);
 
     // Noise model paras for pose
     double ro1_ = 0.01*PI/180, pi1_ = 0.01*PI/180, ya1_ = 0.05*PI/180, x1_ = 0.05, y1_ = 0.05, z1_ = 0.01;
@@ -312,11 +316,11 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
                                                             SourceFrame.altitudes,SourceFrame.ground_ranges,
                                                             TargetFrame.altitudes,TargetFrame.ground_ranges);
 
-    vector<Point3> ini_points = Optimizer::TriangulateLandmarks(kps_pairs, SourceFrame.tf_stb, SourceFrame.tf_port,
-                                                                SourceFrame.img_id, TargetFrame.img_id, 
-                                                                SourceFrame.geo_img, TargetFrame.geo_img,
-                                                                SourceFrame.altitudes, TargetFrame.altitudes,
-                                                                SourceFrame.dr_poses, TargetFrame.dr_poses);
+    // vector<Point3> ini_points = Optimizer::TriangulateLandmarks(kps_pairs, SourceFrame.tf_stb, SourceFrame.tf_port,
+    //                                                             SourceFrame.img_id, TargetFrame.img_id, 
+    //                                                             SourceFrame.geo_img, TargetFrame.geo_img,
+    //                                                             SourceFrame.altitudes, TargetFrame.altitudes,
+    //                                                             SourceFrame.dr_poses, TargetFrame.dr_poses);
 
     vector<tuple<Pose3,Vector6,double>> lc_tf_Conv = Optimizer::LoopClosingTFs(kps_pairs, SourceFrame.tf_stb, SourceFrame.tf_port,
                                                                        SourceFrame.img_id, TargetFrame.img_id, 
@@ -578,7 +582,7 @@ std::vector<Vector6> Optimizer::GetKpsPairs(const bool &USE_ANNO, const cv::Mat 
 
             // for (size_t i = 0; i < kp_pair.size(); i++)
             //     cout << kp_pair(i) << " ";
-            // cout << gra_id_s << " " << gra_id_t << endl;
+            // cout << abs(gra_id_s) << " " << abs(gra_id_t) << endl;
             
             kps_pairs.push_back(kp_pair);
 
@@ -598,22 +602,26 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
                                                 const std::vector<double> &gras_s, const std::vector<double> &gras_t,
                                                 const cv::Mat &dr_poses_s, const cv::Mat &dr_poses_t)
 {
-    bool save_result = 0;
+    bool save_result = 1;
+    Pose3 cps_pose_s = gtsam::Pose3::identity(), cps_pose_t = gtsam::Pose3::identity();
 
-    ofstream save_result_1, save_result_2;
+    ofstream save_result_1, save_result_2, save_r_1, save_p_1, save_r_2, save_p_2;
     if (save_result)
     {
         string path1 = "../ini_lm_errors.txt";
         save_result_1.open(path1.c_str(),ios::trunc);
         string path2 = "../fnl_lm_errors.txt";
         save_result_2.open(path2.c_str(),ios::trunc);
+        string path3 = "../dr_range_e.txt";
+        save_r_1.open(path3.c_str(),ios::trunc);
+        string path4 = "../dr_plane_e.txt";
+        save_p_1.open(path4.c_str(),ios::trunc);
+        string path5 = "../est_range_e.txt";
+        save_r_2.open(path5.c_str(),ios::trunc);
+        string path6 = "../est_plane_e.txt";
+        save_p_2.open(path6.c_str(),ios::trunc);
     }
-    
-
-    Pose3 cps_pose = gtsam::Pose3::identity();
-    if (img_id_s%2!=img_id_t%2)
-        cps_pose = Pose3(Rot3::Rodrigues(0.0, 0.0, PI), Point3(0.0,0.0,0.0));
-    
+        
 
     std::default_random_engine generator;
     std::normal_distribution<double> distribution(0.0,1.0);
@@ -631,7 +639,20 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
     bool graph_option = 0;
     int step_size = 1;
     for (size_t i = 0; i < kps_pairs.size(); i=i+step_size)
-    {   
+    {
+        // get ping id
+        int id_s = kps_pairs[i](0), id_t = kps_pairs[i](3);
+        if (id_s>=dr_poses_s.rows || id_t>=dr_poses_t.rows)
+            cout << "row index out of range !!!" << endl;  
+
+        // stupid but important to avoid unconvergence case
+        double yaw_s = dr_poses_s.at<double>(id_s,2), yaw_t = dr_poses_t.at<double>(id_t,2);
+        if (abs(yaw_s)>2*PI/3)
+            cps_pose_s = Pose3(Rot3::Rodrigues(0.0, 0.0, PI), Point3(0.0,0.0,0.0));
+        if (abs(yaw_t)>2*PI/3)
+            cps_pose_t = Pose3(Rot3::Rodrigues(0.0, 0.0, PI), Point3(0.0,0.0,0.0));
+
+
         // noise model
         auto KP_NOISE_1 = noiseModel::Diagonal::Sigmas(Vector2(sigma_r,kps_pairs[i](2)*alpha_bw));
         auto KP_NOISE_2 = noiseModel::Diagonal::Sigmas(Vector2(sigma_r,kps_pairs[i](5)*alpha_bw));
@@ -639,24 +660,21 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
         // sensor offset
         Pose3 Ts_s;
         if (kps_pairs[i](1)<geo_s[0].cols/2)
-            Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_stb[0], tf_stb[1], tf_stb[2]));
+            Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_stb[0], tf_stb[1], tf_stb[2]))*cps_pose_s;
         else
-            Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_port[0], tf_port[1], tf_port[2]));
+            Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_port[0], tf_port[1], tf_port[2]))*cps_pose_s;
         Pose3 Ts_t;
         if (kps_pairs[i](4)<geo_t[0].cols/2)
-            Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_stb[0], tf_stb[1], tf_stb[2]))*cps_pose;
+            Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_stb[0], tf_stb[1], tf_stb[2]))*cps_pose_t;
         else
-            Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_port[0], tf_port[1], tf_port[2]))*cps_pose;
+            Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_port[0], tf_port[1], tf_port[2]))*cps_pose_t;
 
-        // ping pose
-        int id_s = kps_pairs[i](0), id_t = kps_pairs[i](3);
-        if (id_s>=dr_poses_s.rows || id_t>=dr_poses_t.rows)
-            cout << "row index out of range !!!" << endl;    
+        // ping pose  
         Pose3 Tp_s = Pose3(Rot3::Rodrigues(dr_poses_s.at<double>(id_s,0), dr_poses_s.at<double>(id_s,1), dr_poses_s.at<double>(id_s,2)), 
-                           Point3(dr_poses_s.at<double>(id_s,3), dr_poses_s.at<double>(id_s,4), dr_poses_s.at<double>(id_s,5)));
+                           Point3(dr_poses_s.at<double>(id_s,3), dr_poses_s.at<double>(id_s,4), dr_poses_s.at<double>(id_s,5)))*cps_pose_s;
         Pose3 Tp_t = Pose3(Rot3::Rodrigues(dr_poses_t.at<double>(id_t,0), dr_poses_t.at<double>(id_t,1), dr_poses_t.at<double>(id_t,2)), 
-                           Point3(dr_poses_t.at<double>(id_t,3), dr_poses_t.at<double>(id_t,4), dr_poses_t.at<double>(id_t,5)));
-        Pose3 Tp_st = Tp_s.between(Tp_t*cps_pose);
+                           Point3(dr_poses_t.at<double>(id_t,3), dr_poses_t.at<double>(id_t,4), dr_poses_t.at<double>(id_t,5)))*cps_pose_t;
+        Pose3 Tp_st = Tp_s.between(Tp_t);    
 
         if (graph_option)
         {
@@ -692,7 +710,7 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
             // fix at the source pose with DR prior
             auto PosePriorModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3::Constant(0.000001), Vector3::Constant(0.000001))
                                                                     .finished());
-            graph.addPrior(Symbol('X', 1), Tp_s, PosePriorModel);    
+            graph.addPrior(Symbol('X', 1), Tp_s, PosePriorModel);  
 
             // add odometry factor to graph      
             double ro_ = 0.1*PI/180, pi_ = 0.1*PI/180, ya_ = 1.5*PI/180, x_ = abs(Tp_st.x()*2), y_ = abs(Tp_st.y()/10), z_ = 0.5;
@@ -716,7 +734,7 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
 
             // initialize pose
             initialEstimate.insert(Symbol('X',1), Tp_s);
-            initialEstimate.insert(Symbol('X',2), Tp_t*cps_pose);
+            initialEstimate.insert(Symbol('X',2), Tp_t);
             // std::vector<double> seeds;
             // for (size_t j = 0; j < 6; j++)
             //     seeds.push_back(distribution(generator));        
@@ -727,7 +745,7 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
 
         // constrcut solver and optimize
         gtsam::LevenbergMarquardtParams params; 
-        // params.setVerbosityLM("SUMMARY");
+        params.setVerbosityLM("SUMMARY");
         gtsam::LevenbergMarquardtOptimizer optimizer(graph, initialEstimate, params);
         // GaussNewtonParams parameters;
         // parameters.relativeErrorTol = 1e-5;
@@ -739,7 +757,7 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
         bool printinfo = 1;
         if (printinfo)
         {
-            Pose3 new_pose = result.at<Pose3>(Symbol('X', 2))*cps_pose.inverse();
+            Pose3 new_pose = result.at<Pose3>(Symbol('X', 2))*cps_pose_t.inverse();
             cout << "Add New KP Measurement: L" << i << " ";
             cout << "between ping " << kps_pairs[i](0) << " and " << kps_pairs[i](3) << " " << endl;
             // cout << "NEW POSE: " << endl << new_pose.translation() << endl;
@@ -747,9 +765,11 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
             // cout << "INI POSE: " << endl << (Tp_t.compose(add_noise)).translation() << endl;
         }
 
-        // evaluate if the estimation improves after optimization
-        bool eval_1 = 1;
+        // evaluate if the estimation improves after optimization 
+        bool eval_1 = 1, eval_2 = 1;
         double lm_dist_compare = 0;
+
+        // --- (option 1) --- //
         if (eval_1)
         {
             double x_dist, y_dist;
@@ -764,10 +784,7 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
 
             // final landmark distance observed between two estimated ping poses
             double lm_geo_t_x, lm_geo_t_y;
-            Pose3 new_pose = result.at<Pose3>(Symbol('X', 2))*cps_pose.inverse();
-            // Pose3 new_pose = Tp_t;
-            // cout << new_pose.x() << " " << new_pose.y() << " " << new_pose.rotation().yaw() << endl;
-            // cout << dr_poses_t.at<double>(id_t,3) << " " << dr_poses_t.at<double>(id_t,4)  << " " << dr_poses_t.at<double>(id_t,2) << endl;
+            Pose3 new_pose = result.at<Pose3>(Symbol('X', 2))*cps_pose_t.inverse();
             if (kps_pairs[i](4)<geo_t[0].cols/2)
             {
                 int gr_idx = geo_t[0].cols/2 - kps_pairs[i](4);
@@ -781,10 +798,10 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
                 lm_geo_t_y = new_pose.y() + gras_t[gr_idx]*sin(new_pose.rotation().yaw()-PI/2-PI);
             }
             x_dist = (geo_s[0].at<double>(id_s,id_ss)-lm_geo_t_x);
-            y_dist = (geo_s[1].at<double>(id_s,id_ss)-lm_geo_t_y);
+            y_dist = (geo_s[1].at<double>(id_s,id_ss)-lm_geo_t_y);          
             double final_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);   
 
-            cout << "landmark distance (initial VS final): " << ini_point_dist << " " << final_point_dist << endl << endl;
+            cout << "****** landmark distance (initial VS final): " << ini_point_dist << " " << final_point_dist  << endl;
             lm_dist_compare = ini_point_dist-final_point_dist;
 
             if (save_result)
@@ -795,12 +812,54 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
 
         }
 
+        // --- (option 2) --- //
+        if (eval_2)
+        {
+            // evaluate landmark using dr pose
+            Point3 lm_dr =  Optimizer::TriangulateOneLandmark(kps_pairs[i],Ts_s,Ts_t,Tp_s,Tp_t,initialEstimate.at<Point3>(Symbol('L',1)));
+
+            Point3 lm_dr_s = Ts_s.transformTo( Tp_s.transformTo(lm_dr) );
+            Point3 lm_dr_t = Ts_t.transformTo( Tp_t.transformTo(lm_dr) );
+
+            cout << "****** initial (using DR poses) range and plane consistency error:" << endl;
+            cout << "source: (" << abs(gtsam::norm3(lm_dr_s)-kps_pairs[i](2)) << " " << abs(lm_dr_s.x())  << "), ";
+            cout << "target: (" << abs(gtsam::norm3(lm_dr_t)-kps_pairs[i](5)) << " " << abs(lm_dr_t.x())  << "), " ;
+            cout << "avg: (" << (abs(gtsam::norm3(lm_dr_s)-kps_pairs[i](2))+abs(gtsam::norm3(lm_dr_t)-kps_pairs[i](5)))/2 << " ";
+            cout << (abs(lm_dr_s.x())+abs(lm_dr_t.x()))/2  << ")" << endl;
+
+            if (save_result)
+            {
+                save_r_1 << (abs(gtsam::norm3(lm_dr_s)-kps_pairs[i](2))+abs(gtsam::norm3(lm_dr_t)-kps_pairs[i](5)))/2 << endl;
+                save_p_1 << (abs(lm_dr_s.x())+abs(lm_dr_t.x()))/2 << endl;
+            }  
+
+            // evaluate landmark using estimated pose
+            Point3 lm_est =  result.at<Point3>(Symbol('L',1));
+
+            Point3 lm_est_s = Ts_s.transformTo( result.at<Pose3>(Symbol('X',1)).transformTo(lm_est) );
+            Point3 lm_est_t = Ts_t.transformTo( result.at<Pose3>(Symbol('X',2)).transformTo(lm_est) );
+
+            cout << "****** final (using estimated poses) range and plane consistency error:" << endl; 
+            cout << "source: (" << abs(gtsam::norm3(lm_est_s)-kps_pairs[i](2)) << " " << abs(lm_est_s.x())  << "), ";
+            cout << "target: (" << abs(gtsam::norm3(lm_est_t)-kps_pairs[i](5)) << " " << abs(lm_est_t.x())  << "), ";
+            cout << "avg: (" << (abs(gtsam::norm3(lm_est_s)-kps_pairs[i](2))+abs(gtsam::norm3(lm_est_t)-kps_pairs[i](5)))/2 << " ";
+            cout << (abs(lm_est_s.x())+abs(lm_est_t.x()))/2  << ")" << endl << endl;         
+
+            if (save_result)
+            {
+                save_r_2 << (abs(gtsam::norm3(lm_est_s)-kps_pairs[i](2))+abs(gtsam::norm3(lm_est_t)-kps_pairs[i](5)))/2 << endl;
+                save_p_2 << (abs(lm_est_s.x())+abs(lm_est_t.x()))/2 << endl;
+            } 
+
+        }
+        
+
         Marginals marginals(graph, result, Marginals::QR);
 
-        output_tfs.push_back(std::make_tuple(Tp_s.between(result.at<Pose3>(Symbol('X',2))*cps_pose.inverse()), 
-                                             marginals.marginalCovariance(Symbol('X',2)).diagonal(),
-                                             lm_dist_compare));
-
+        output_tfs.push_back(std::make_tuple((Tp_s*cps_pose_s.inverse()).between(result.at<Pose3>(Symbol('X',2))*cps_pose_t.inverse()), 
+                                              marginals.marginalCovariance(Symbol('X',2)).diagonal(),
+                                              lm_dist_compare));           
+        
         // Clear the factor graph and values for the next iteration
         graph.resize(0);
         initialEstimate.clear();
@@ -810,6 +869,10 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
     {
         save_result_1.close();
         save_result_2.close();
+        save_r_1.close();
+        save_p_1.close();
+        save_r_2.close();
+        save_p_2.close();
     }
     
     
@@ -1148,7 +1211,7 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &img_id_s
         y_dist = (lm_geo_s_y-lm_geo_t_y);
         double final_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);   
 
-        if (1)
+        if (0)
         {
             cout << "lm distance (ini VS fnl) at SourcePing #" << id_s << " :" << ini_point_dist << " " << final_point_dist << " "
                 <<  ini_point_dist-final_point_dist << endl;
@@ -1243,99 +1306,257 @@ void Optimizer::EvaluateByAnnosAll(const Values &FinalEstimate, const std::vecto
                                     const std::vector<std::vector<cv::Mat>> &geo_img_all,
                                     const std::vector<std::vector<double>> &gras_all,
                                     const std::vector<std::vector<Vector6>> &kps_pairs_all,
-                                    const std::vector<pair<int,int>> &img_pairs_ids)
+                                    const std::vector<pair<int,int>> &img_pairs_ids,
+                                    const std::vector<cv::Mat> &dr_poses_all,
+                                    const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
+                                    const std::vector<std::vector<double>> &alts_all)
 {
 
-    bool save_result = 1, show_result = 0;
+    bool save_result = 1, show_result = 0, show_stats = 1;
+    bool eval_1 = 0, eval_2 = 1;
 
-    // loop for keypoint pairs in each image pair
-    for (size_t i = 0; i < kps_pairs_all.size(); i++)
+    if (eval_2)
     {
-        ofstream save_result_1, save_result_2, save_result_3;
-        if (save_result)
-        { 
-            string path1 = "../result/anno_errors/dr_lm_dist_" + std::to_string(i) + ".txt";
-            save_result_1.open(path1.c_str(),ios::trunc);
-            string path2 = "../result/anno_errors/est_lm_dist_" + std::to_string(i) + ".txt";
-            save_result_2.open(path2.c_str(),ios::trunc);
-            string path3 = "../result/anno_errors/lm_dist_compare_" + std::to_string(i) + ".txt";
-            save_result_3.open(path3.c_str(),ios::trunc);
-        }
-
-        // loop for each keypoint pair in current image pair
-        for (size_t j = 0; j < kps_pairs_all[i].size(); j++)
+        // loop for keypoint pairs in each image pair
+        for (size_t i = 0; i < kps_pairs_all.size(); i++)
         {
-            double x_dist, y_dist;
-
-            int id_s = kps_pairs_all[i][j](0), id_t = kps_pairs_all[i][j](3);
-            if (id_s>=geo_img_all[img_pairs_ids[i].first][0].rows || id_t>=geo_img_all[img_pairs_ids[i].second][0].rows)
-                cout << "row index out of range !!! (in evaluation all)" << endl;  
-            int id_ss = kps_pairs_all[i][j](1), id_tt = kps_pairs_all[i][j](4);
-            if (id_ss>=geo_img_all[img_pairs_ids[i].first][0].cols || id_tt>=geo_img_all[img_pairs_ids[i].second][0].cols)
-                cout << "column index out of range !!! (in evaluation all)" << endl;
-
-            // --- initial landmark distance observed between two DR ping poses --- //  
-            x_dist = (geo_img_all[img_pairs_ids[i].first][0].at<double>(id_s,id_ss)-geo_img_all[img_pairs_ids[i].second][0].at<double>(id_t,id_tt));
-            y_dist = (geo_img_all[img_pairs_ids[i].first][1].at<double>(id_s,id_ss)-geo_img_all[img_pairs_ids[i].second][1].at<double>(id_t,id_tt));
-            double ini_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);
-
-            // --- final landmark distance observed between two estimated ping poses --- //
-            double lm_geo_s_x, lm_geo_s_y, lm_geo_t_x, lm_geo_t_y;
-
-            Pose3 new_pose_s = FinalEstimate.at<Pose3>(Symbol('X', unique_id[img_pairs_ids[i].first][id_s]));
-            if (kps_pairs_all[i][j](1)<geo_img_all[img_pairs_ids[i].first][0].cols/2)
-            {
-                int gr_idx = geo_img_all[img_pairs_ids[i].first][0].cols/2 - kps_pairs_all[i][j](1);
-                lm_geo_s_x = new_pose_s.x() + gras_all[img_pairs_ids[i].first][gr_idx]*cos(new_pose_s.rotation().yaw()+PI/2-PI);
-                lm_geo_s_y = new_pose_s.y() + gras_all[img_pairs_ids[i].first][gr_idx]*sin(new_pose_s.rotation().yaw()+PI/2-PI);
-            }
-            else
-            {
-                int gr_idx = kps_pairs_all[i][j](1) - geo_img_all[img_pairs_ids[i].first][0].cols/2;
-                lm_geo_s_x = new_pose_s.x() + gras_all[img_pairs_ids[i].first][gr_idx]*cos(new_pose_s.rotation().yaw()-PI/2-PI);
-                lm_geo_s_y = new_pose_s.y() + gras_all[img_pairs_ids[i].first][gr_idx]*sin(new_pose_s.rotation().yaw()-PI/2-PI);
+            int good_count_1 = 0, good_count_2 = 0;
+            ofstream save_result_1, save_result_2, save_result_3, save_result_4;
+            if (save_result)
+            { 
+                string path1 = "../result/pr_errors/dr_range_e_" + std::to_string(i) + ".txt";
+                save_result_1.open(path1.c_str(),ios::trunc);
+                string path2 = "../result/pr_errors/dr_plane_e_" + std::to_string(i) + ".txt";
+                save_result_2.open(path2.c_str(),ios::trunc);
+                string path3 = "../result/pr_errors/est_range_e_" + std::to_string(i) + ".txt";
+                save_result_3.open(path3.c_str(),ios::trunc);
+                string path4 = "../result/pr_errors/est_plane_e_" + std::to_string(i) + ".txt";
+                save_result_4.open(path4.c_str(),ios::trunc);
             }
 
-            Pose3 new_pose_t = FinalEstimate.at<Pose3>(Symbol('X', unique_id[img_pairs_ids[i].second][id_t]));
-            if (kps_pairs_all[i][j](4)<geo_img_all[img_pairs_ids[i].second][0].cols/2)
+            // loop for each keypoint pair in current image pair
+            for (size_t j = 0; j < kps_pairs_all[i].size(); j++)
             {
-                int gr_idx = geo_img_all[img_pairs_ids[i].second][0].cols/2 - kps_pairs_all[i][j](4);
-                lm_geo_t_x = new_pose_t.x() + gras_all[img_pairs_ids[i].second][gr_idx]*cos(new_pose_t.rotation().yaw()+PI/2-PI);
-                lm_geo_t_y = new_pose_t.y() + gras_all[img_pairs_ids[i].second][gr_idx]*sin(new_pose_t.rotation().yaw()+PI/2-PI);
+                int id_s = kps_pairs_all[i][j](0), id_t = kps_pairs_all[i][j](3);
+                if (id_s>=geo_img_all[img_pairs_ids[i].first][0].rows || id_t>=geo_img_all[img_pairs_ids[i].second][0].rows)
+                    cout << "row index out of range !!! (in evaluation all)" << endl;  
+                int id_ss = kps_pairs_all[i][j](1), id_tt = kps_pairs_all[i][j](4);
+                if (id_ss>=geo_img_all[img_pairs_ids[i].first][0].cols || id_tt>=geo_img_all[img_pairs_ids[i].second][0].cols)
+                    cout << "column index out of range !!! (in evaluation all)" << endl;
+
+                // sensor offset
+                Pose3 Ts_s;
+                if (kps_pairs_all[i][j](1)<geo_img_all[img_pairs_ids[i].first][0].cols/2)
+                    Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_stb[0], tf_stb[1], tf_stb[2]));
+                else
+                    Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_port[0], tf_port[1], tf_port[2]));
+                Pose3 Ts_t;
+                if (kps_pairs_all[i][j](4)<geo_img_all[img_pairs_ids[i].second][0].cols/2)
+                    Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_stb[0], tf_stb[1], tf_stb[2]));
+                else
+                    Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_port[0], tf_port[1], tf_port[2]));
+
+                // DR poses
+                Pose3 old_pose_s = Pose3(
+                    Rot3::Rodrigues(dr_poses_all[img_pairs_ids[i].first].at<double>(id_s,0),
+                                    dr_poses_all[img_pairs_ids[i].first].at<double>(id_s,1),
+                                    dr_poses_all[img_pairs_ids[i].first].at<double>(id_s,2)), 
+                    Point3(dr_poses_all[img_pairs_ids[i].first].at<double>(id_s,3),
+                           dr_poses_all[img_pairs_ids[i].first].at<double>(id_s,4), 
+                           dr_poses_all[img_pairs_ids[i].first].at<double>(id_s,5)));
+                Pose3 old_pose_t = Pose3(
+                    Rot3::Rodrigues(dr_poses_all[img_pairs_ids[i].second].at<double>(id_t,0),
+                                    dr_poses_all[img_pairs_ids[i].second].at<double>(id_t,1),
+                                    dr_poses_all[img_pairs_ids[i].second].at<double>(id_t,2)), 
+                    Point3(dr_poses_all[img_pairs_ids[i].second].at<double>(id_t,3),
+                           dr_poses_all[img_pairs_ids[i].second].at<double>(id_t,4), 
+                           dr_poses_all[img_pairs_ids[i].second].at<double>(id_t,5)));
+
+                // initialize point with dr poses
+                double x_bar = (geo_img_all[img_pairs_ids[i].first][0].at<double>(id_s,id_ss)+geo_img_all[img_pairs_ids[i].second][0].at<double>(id_t,id_tt))/2;
+                double y_bar = (geo_img_all[img_pairs_ids[i].first][1].at<double>(id_s,id_ss)+geo_img_all[img_pairs_ids[i].second][1].at<double>(id_t,id_tt))/2;
+                double z_bar = ( (dr_poses_all[img_pairs_ids[i].first].at<double>(id_s,5)-alts_all[img_pairs_ids[i].first][id_s]) + 
+                                 (dr_poses_all[img_pairs_ids[i].second].at<double>(id_t,5)-alts_all[img_pairs_ids[i].second][id_t]) )/2;
+
+                // evaluate landmark using dr pose
+                Point3 lm_dr =  Optimizer::TriangulateOneLandmark(kps_pairs_all[i][j],Ts_s,Ts_t,old_pose_s,old_pose_t,Point3(x_bar, y_bar, z_bar));
+
+                Point3 lm_dr_s = Ts_s.transformTo( old_pose_s.transformTo(lm_dr) );
+                Point3 lm_dr_t = Ts_t.transformTo( old_pose_t.transformTo(lm_dr) );
+
+                if (show_result)
+                {
+                    cout << "****** initial (using DR poses) range and plane consistency error:" << endl;
+                    cout << "source: (" << abs(gtsam::norm3(lm_dr_s)-kps_pairs_all[i][j](2)) << " " << abs(lm_dr_s.x())  << "), ";
+                    cout << "target: (" << abs(gtsam::norm3(lm_dr_t)-kps_pairs_all[i][j](5)) << " " << abs(lm_dr_t.x())  << "), " ;
+                    cout << "avg: (" << (abs(gtsam::norm3(lm_dr_s)-kps_pairs_all[i][j](2))+abs(gtsam::norm3(lm_dr_t)-kps_pairs_all[i][j](5)))/2 << " ";
+                    cout << "(" << (abs(lm_dr_s.x())+abs(lm_dr_t.x()))/2  << ")" << endl;
+                }
+                if (save_result)
+                {
+                    save_result_1 << (abs(gtsam::norm3(lm_dr_s)-kps_pairs_all[i][j](2))+abs(gtsam::norm3(lm_dr_t)-kps_pairs_all[i][j](5)))/2 << endl;
+                    save_result_2 << (abs(lm_dr_s.x())+abs(lm_dr_t.x()))/2 << endl;   
+                }
+                
+                
+
+                // Estimated poses
+                Pose3 new_pose_s = FinalEstimate.at<Pose3>(Symbol('X', unique_id[img_pairs_ids[i].first][id_s]));
+                Pose3 new_pose_t = FinalEstimate.at<Pose3>(Symbol('X', unique_id[img_pairs_ids[i].second][id_t]));
+
+                // evaluate landmark using dr pose
+                Point3 lm_est =  Optimizer::TriangulateOneLandmark(kps_pairs_all[i][j],Ts_s,Ts_t,new_pose_s,new_pose_t,Point3(x_bar, y_bar, z_bar));
+
+
+                Point3 lm_est_s = Ts_s.transformTo( new_pose_s.transformTo(lm_est) );
+                Point3 lm_est_t = Ts_t.transformTo( new_pose_t.transformTo(lm_est) );
+
+                if (show_result)
+                {
+                    cout << "****** final (using estimated poses) range and plane consistency error:" << endl;
+                    cout << "source: (" << abs(gtsam::norm3(lm_est_s)-kps_pairs_all[i][j](2)) << " " << abs(lm_est_s.x())  << "), ";
+                    cout << "target: (" << abs(gtsam::norm3(lm_est_t)-kps_pairs_all[i][j](5)) << " " << abs(lm_est_t.x())  << "), ";
+                    cout << "avg: (" << (abs(gtsam::norm3(lm_est_s)-kps_pairs_all[i][j](2))+abs(gtsam::norm3(lm_est_t)-kps_pairs_all[i][j](5)))/2 << " ";
+                    cout << "(" << (abs(lm_est_s.x())+abs(lm_est_t.x()))/2  << ")" << endl << endl;
+                }
+                if (save_result)
+                {
+                    save_result_3 << (abs(gtsam::norm3(lm_est_s)-kps_pairs_all[i][j](2))+abs(gtsam::norm3(lm_est_t)-kps_pairs_all[i][j](5)))/2 << endl;
+                    save_result_4 << (abs(lm_est_s.x())+abs(lm_est_t.x()))/2  << endl;   
+                }
+
+                if (show_stats)
+                {
+                    double range_dr, range_est, plane_dr, plane_est;
+                    range_dr = (abs(gtsam::norm3(lm_dr_s)-kps_pairs_all[i][j](2))+abs(gtsam::norm3(lm_dr_t)-kps_pairs_all[i][j](5)))/2;
+                    plane_dr = (abs(lm_dr_s.x()) + abs(lm_dr_t.x()))/2;
+                    range_est = (abs(gtsam::norm3(lm_est_s)-kps_pairs_all[i][j](2))+abs(gtsam::norm3(lm_est_t)-kps_pairs_all[i][j](5)))/2 ;
+                    plane_est = (abs(lm_est_t.x()) + abs(lm_est_s.x()))/2;
+
+                    if (range_dr>range_est)
+                        good_count_1++;
+
+                    if (plane_dr>plane_est)
+                        good_count_2++;
+
+                }
+                
             }
-            else
+
+            if (show_stats)
             {
-                int gr_idx = kps_pairs_all[i][j](4) - geo_img_all[img_pairs_ids[i].second][0].cols/2;
-                lm_geo_t_x = new_pose_t.x() + gras_all[img_pairs_ids[i].second][gr_idx]*cos(new_pose_t.rotation().yaw()-PI/2-PI);
-                lm_geo_t_y = new_pose_t.y() + gras_all[img_pairs_ids[i].second][gr_idx]*sin(new_pose_t.rotation().yaw()-PI/2-PI);
+                cout << "metric statics: " << (double)good_count_1/kps_pairs_all[i].size()*100 << " " << (double)good_count_2/kps_pairs_all[i].size()*100 << " ";
+                cout << kps_pairs_all[i].size() << " " << img_pairs_ids[i].first << " " << img_pairs_ids[i].second << endl;
             }
-            x_dist = (lm_geo_s_x-lm_geo_t_x);
-            y_dist = (lm_geo_s_y-lm_geo_t_y);
-            double final_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);
 
             if (save_result)
             {
-                save_result_1 << ini_point_dist << endl;
-                save_result_2 << final_point_dist << endl;   
-                save_result_3 << ini_point_dist-final_point_dist << endl;       
-            } 
-
-            if (show_result)
-            {
-                cout << "lm distance (ini VS fnl) at SourcePing #" << id_s << " :" << ini_point_dist << " " << final_point_dist << " "
-                    <<  ini_point_dist-final_point_dist << endl;
-            } 
+                save_result_1.close();
+                save_result_2.close();
+                save_result_3.close();
+                save_result_4.close();
+            }
+        
 
         }
+    }
 
-    if (save_result)
+    if (eval_1)
     {
-        save_result_1.close();
-        save_result_2.close();
-        save_result_3.close();
+        // loop for keypoint pairs in each image pair
+        for (size_t i = 0; i < kps_pairs_all.size(); i++)
+        {
+            ofstream save_result_1, save_result_2, save_result_3;
+            if (save_result)
+            { 
+                string path1 = "../result/anno_errors/dr_lm_dist_" + std::to_string(i) + ".txt";
+                save_result_1.open(path1.c_str(),ios::trunc);
+                string path2 = "../result/anno_errors/est_lm_dist_" + std::to_string(i) + ".txt";
+                save_result_2.open(path2.c_str(),ios::trunc);
+                string path3 = "../result/anno_errors/lm_dist_compare_" + std::to_string(i) + ".txt";
+                save_result_3.open(path3.c_str(),ios::trunc);
+            }
+
+            // loop for each keypoint pair in current image pair
+            for (size_t j = 0; j < kps_pairs_all[i].size(); j++)
+            {
+                double x_dist, y_dist;
+
+                int id_s = kps_pairs_all[i][j](0), id_t = kps_pairs_all[i][j](3);
+                if (id_s>=geo_img_all[img_pairs_ids[i].first][0].rows || id_t>=geo_img_all[img_pairs_ids[i].second][0].rows)
+                    cout << "row index out of range !!! (in evaluation all)" << endl;  
+                int id_ss = kps_pairs_all[i][j](1), id_tt = kps_pairs_all[i][j](4);
+                if (id_ss>=geo_img_all[img_pairs_ids[i].first][0].cols || id_tt>=geo_img_all[img_pairs_ids[i].second][0].cols)
+                    cout << "column index out of range !!! (in evaluation all)" << endl;
+
+                // --- initial landmark distance observed between two DR ping poses --- //  
+                x_dist = (geo_img_all[img_pairs_ids[i].first][0].at<double>(id_s,id_ss)-geo_img_all[img_pairs_ids[i].second][0].at<double>(id_t,id_tt));
+                y_dist = (geo_img_all[img_pairs_ids[i].first][1].at<double>(id_s,id_ss)-geo_img_all[img_pairs_ids[i].second][1].at<double>(id_t,id_tt));
+                double ini_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);
+                double ini_x_dist = x_dist, ini_y_dist = y_dist;
+
+                // --- final landmark distance observed between two estimated ping poses --- //
+                double lm_geo_s_x, lm_geo_s_y, lm_geo_t_x, lm_geo_t_y;
+
+                Pose3 new_pose_s = FinalEstimate.at<Pose3>(Symbol('X', unique_id[img_pairs_ids[i].first][id_s]));
+                if (kps_pairs_all[i][j](1)<geo_img_all[img_pairs_ids[i].first][0].cols/2)
+                {
+                    int gr_idx = geo_img_all[img_pairs_ids[i].first][0].cols/2 - kps_pairs_all[i][j](1);
+                    lm_geo_s_x = new_pose_s.x() + gras_all[img_pairs_ids[i].first][gr_idx]*cos(new_pose_s.rotation().yaw()+PI/2-PI);
+                    lm_geo_s_y = new_pose_s.y() + gras_all[img_pairs_ids[i].first][gr_idx]*sin(new_pose_s.rotation().yaw()+PI/2-PI);
+                }
+                else
+                {
+                    int gr_idx = kps_pairs_all[i][j](1) - geo_img_all[img_pairs_ids[i].first][0].cols/2;
+                    lm_geo_s_x = new_pose_s.x() + gras_all[img_pairs_ids[i].first][gr_idx]*cos(new_pose_s.rotation().yaw()-PI/2-PI);
+                    lm_geo_s_y = new_pose_s.y() + gras_all[img_pairs_ids[i].first][gr_idx]*sin(new_pose_s.rotation().yaw()-PI/2-PI);
+                }
+
+                Pose3 new_pose_t = FinalEstimate.at<Pose3>(Symbol('X', unique_id[img_pairs_ids[i].second][id_t]));
+                if (kps_pairs_all[i][j](4)<geo_img_all[img_pairs_ids[i].second][0].cols/2)
+                {
+                    int gr_idx = geo_img_all[img_pairs_ids[i].second][0].cols/2 - kps_pairs_all[i][j](4);
+                    lm_geo_t_x = new_pose_t.x() + gras_all[img_pairs_ids[i].second][gr_idx]*cos(new_pose_t.rotation().yaw()+PI/2-PI);
+                    lm_geo_t_y = new_pose_t.y() + gras_all[img_pairs_ids[i].second][gr_idx]*sin(new_pose_t.rotation().yaw()+PI/2-PI);
+                }
+                else
+                {
+                    int gr_idx = kps_pairs_all[i][j](4) - geo_img_all[img_pairs_ids[i].second][0].cols/2;
+                    lm_geo_t_x = new_pose_t.x() + gras_all[img_pairs_ids[i].second][gr_idx]*cos(new_pose_t.rotation().yaw()-PI/2-PI);
+                    lm_geo_t_y = new_pose_t.y() + gras_all[img_pairs_ids[i].second][gr_idx]*sin(new_pose_t.rotation().yaw()-PI/2-PI);
+                }
+                x_dist = (lm_geo_s_x-lm_geo_t_x);
+                y_dist = (lm_geo_s_y-lm_geo_t_y);
+                double final_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);
+                double fnl_x_dist = x_dist, fnl_y_dist = y_dist;
+
+                if (save_result)
+                {
+                    save_result_1 << ini_point_dist << endl;
+                    save_result_2 << final_point_dist << endl;   
+                    save_result_3 << ini_point_dist-final_point_dist << endl;       
+                } 
+
+                if (show_result)
+                {
+                    cout << "lm distance (ini VS fnl) at SourcePing #" << id_s << " :" << ini_point_dist << " " << final_point_dist << " "
+                        <<  ini_point_dist-final_point_dist << endl;
+                    cout << "split in x: " << ini_x_dist << " " << fnl_x_dist << "; and y: " << ini_y_dist << " " << fnl_y_dist << endl;
+                } 
+
+            }
+
+            if (save_result)
+            {
+                save_result_1.close();
+                save_result_2.close();
+                save_result_3.close();
+            }
+            
+        }
     }
-        
-    }
+
+    
 
     return;
 }

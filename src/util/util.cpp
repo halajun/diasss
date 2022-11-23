@@ -183,6 +183,8 @@ void Util::LoadInputData(const std::string &strImageFolder, const std::string &s
 void Util::ShowAnnos(int &f1, int &f2, cv::Mat &img1, cv::Mat &img2, const cv::Mat &anno1, const cv::Mat &anno2)
 {
 
+    bool use_anno = 0;
+
     // --- load annotated keypoints --- //
     std::vector<cv::KeyPoint> PreKeys, CurKeys;
     std::vector<cv::DMatch> TemperalMatches;
@@ -190,14 +192,30 @@ void Util::ShowAnnos(int &f1, int &f2, cv::Mat &img1, cv::Mat &img2, const cv::M
     // --- from img1 to img2 ....... //
     for (size_t i = 0; i < anno1.rows; i++)
     {
-        if (anno1.at<int>(i,1)==f2 && i%15==0)
+        if (use_anno)
         {
-            PreKeys.push_back(cv::KeyPoint(anno1.at<int>(i,3),anno1.at<int>(i,2),0,0,0,-1));
-            CurKeys.push_back(cv::KeyPoint(anno1.at<int>(i,5),anno1.at<int>(i,4),0,0,0,-1));
-            TemperalMatches.push_back(cv::DMatch(count,count,0));
-            count = count + 1;
-            // cout << anno1.at<int>(i,2) << " " << anno1.at<int>(i,3) << " " << anno1.at<int>(i,4) << " " << anno1.at<int>(i,5) << endl;
-        }     
+            if (anno1.at<int>(i,1)==f2 && i%15==0)
+            {
+                PreKeys.push_back(cv::KeyPoint(anno1.at<int>(i,3),anno1.at<int>(i,2),0,0,0,-1));
+                CurKeys.push_back(cv::KeyPoint(anno1.at<int>(i,5),anno1.at<int>(i,4),0,0,0,-1));
+                TemperalMatches.push_back(cv::DMatch(count,count,0));
+                count = count + 1;
+                // cout << anno1.at<int>(i,2) << " " << anno1.at<int>(i,3) << " " << anno1.at<int>(i,4) << " " << anno1.at<int>(i,5) << endl;
+            }  
+        }
+        else
+        {
+            if (anno1.at<double>(i,1)==f2)
+            {
+                PreKeys.push_back(cv::KeyPoint(anno1.at<double>(i,3),anno1.at<double>(i,2),0,0,0,-1));
+                CurKeys.push_back(cv::KeyPoint(anno1.at<double>(i,5),anno1.at<double>(i,4),0,0,0,-1));
+                TemperalMatches.push_back(cv::DMatch(count,count,0));
+                count = count + 1;
+                // cout << anno1.at<int>(i,2) << " " << anno1.at<int>(i,3) << " " << anno1.at<int>(i,4) << " " << anno1.at<int>(i,5) << endl;
+            } 
+        }
+        
+           
     }
     // // --- from img2 to img1 ....... //
     // for (size_t i = 0; i < anno2.rows; i++)

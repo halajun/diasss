@@ -26,6 +26,7 @@ Frame::Frame(const int &id, const cv::Mat &mImg, const cv::Mat &mPose, const std
     ground_ranges = vGrange;
     img_id = id;
     anno_kps = mAnno;
+    
     tf_stb = {-3.119, -0.405, -0.146}; // sensor offset (starboard) ENU
     tf_port = {-3.119, 0.405, -0.146}; // sensor offset (port) ENU
 
