@@ -60,7 +60,7 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
     std::vector<int> ID_loc;
 
     // --- some parameters --- //
-    int radius = 12; // seach circle size
+    int radius = 12; // search circle size
     int x_min, y_min, x_max, y_max; // rectangle of seach window
     double bx_min, bx_max, by_min, by_max; // geometric border of reference image
 
@@ -103,7 +103,7 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
         {
             double best_dist = 1000, sec_best_dist = 1000, dist_bound = 150;
             int best_id = -1;
-            double ratio_test = 0.3;
+            double ratio_test = 0.5;
             for (size_t j = 0; j < candidate.size(); j++)
             {
                 const double dst_dist = cv::norm(dst.row(i),dst_ref.row(candidate[j]),cv::NORM_L2);
@@ -172,8 +172,9 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
     }
 
     // --- Sliding Compatibility Check on the X axis of keypoints --- //
-    int final_inlier_num = 0, iter_num = 0, max_iter = 300, sam_num = 3;
-    double PixError = 2.0;
+    // cout << "size of first selections: " << ID_loc.size() << endl;
+    int final_inlier_num = 0, iter_num = 0, max_iter = 800, sam_num = 2;
+    double PixError = 3.2;
     std::vector<int> CorresID_final = std::vector<int>(kps.size(),-1);
     while (iter_num<max_iter)
     {

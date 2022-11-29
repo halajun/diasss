@@ -78,6 +78,9 @@ using namespace gtsam;
                                     const std::vector<cv::Mat> &geo_s, const std::vector<cv::Mat> &geo_t,
                                     const std::vector<double> &gras_s, const std::vector<double> &gras_t,
                                     const cv::Mat &anno_kps_s, const cv::Mat &anno_kps_t,
+                                    const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
+                                    const cv::Mat &dr_poses_s, const cv::Mat &dr_poses_t,
+                                    const std::vector<double> &alts_s, const std::vector<double> &alts_t,
                                     const std::vector<Vector6> &kps_pairs_est);
 
         void static EvaluateByAnnosAll(const Values &FinalEstimate, const std::vector<std::vector<int>> &unique_id,
