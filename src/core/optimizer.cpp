@@ -314,16 +314,19 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
     std::normal_distribution<double> distribution(0.0,1.0);
     double noise_xyz = 5, noise_rpy = 5*PI/180;
 
-
-    std::vector<Vector6> kps_pairs = Optimizer::GetKpsPairs(USE_ANNO,SourceFrame.corres_kps,SourceFrame.img_id,TargetFrame.img_id,
-                                                            SourceFrame.altitudes,SourceFrame.ground_ranges,
-                                                            TargetFrame.altitudes,TargetFrame.ground_ranges);
-
-    // vector<Point3> ini_points = Optimizer::TriangulateLandmarks(kps_pairs, SourceFrame.tf_stb, SourceFrame.tf_port,
-    //                                                             SourceFrame.img_id, TargetFrame.img_id, 
-    //                                                             SourceFrame.geo_img, TargetFrame.geo_img,
-    //                                                             SourceFrame.altitudes, TargetFrame.altitudes,
-    //                                                             SourceFrame.dr_poses, TargetFrame.dr_poses);
+    std::vector<Vector6> kps_pairs;
+    if (USE_ANNO)
+    {
+        kps_pairs = Optimizer::GetKpsPairs(USE_ANNO,SourceFrame.anno_kps,SourceFrame.img_id,TargetFrame.img_id,
+                                                                SourceFrame.altitudes,SourceFrame.ground_ranges,
+                                                                TargetFrame.altitudes,TargetFrame.ground_ranges);
+    }
+    else
+    {
+        kps_pairs = Optimizer::GetKpsPairs(USE_ANNO,SourceFrame.corres_kps,SourceFrame.img_id,TargetFrame.img_id,
+                                                                SourceFrame.altitudes,SourceFrame.ground_ranges,
+                                                                TargetFrame.altitudes,TargetFrame.ground_ranges);
+    }
 
     vector<tuple<Pose3,Vector6,double>> lc_tf_Conv = Optimizer::LoopClosingTFs(kps_pairs, SourceFrame.tf_stb, SourceFrame.tf_port,
                                                                        SourceFrame.img_id, TargetFrame.img_id, 
@@ -488,10 +491,10 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
         // --- if loop closing measurement found, construct factor and add to graph --- //
         if (kps_id!=-1 && ADD_LC)
         {
-            cout << "***********************************************************" << endl;
-            cout << "Add New Loop Closure Constraint" << " ";
-            cout << "between X" << g_id_s[(int)kps_pairs[kps_id](0)] << " and X" << g_id_t[(int)kps_pairs[kps_id](3)] << " ";
-            cout << "(" << kps_pairs[kps_id](0) << " and " << kps_pairs[kps_id](3) << ")" << endl;
+            // cout << "***********************************************************" << endl;
+            // cout << "Add New Loop Closure Constraint" << " ";
+            // cout << "between X" << g_id_s[(int)kps_pairs[kps_id](0)] << " and X" << g_id_t[(int)kps_pairs[kps_id](3)] << " ";
+            // cout << "(" << kps_pairs[kps_id](0) << " and " << kps_pairs[kps_id](3) << ")" << endl;
 
             // loop closure uncertainty model
             auto LoopClosureNoiseModel = gtsam::noiseModel::Diagonal::Variances(get<1>(lc_tf_Conv[kps_id]));
@@ -557,7 +560,8 @@ std::vector<Vector6> Optimizer::GetKpsPairs(const bool &USE_ANNO, const cv::Mat 
 
     std::vector<Vector6> kps_pairs;
 
-    for (size_t i = 0; i < kps.rows; i++)
+    int step_size = 1;
+    for (size_t i = 0; i < kps.rows; i=i+step_size)
     {
         // decide which frame id is the target (associated) frame
         int id_check;
@@ -675,16 +679,29 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
         auto KP_NOISE_2 = noiseModel::Diagonal::Sigmas(Vector2(sigma_r,kps_pairs[i](5)*alpha_bw));
 
         // sensor offset
+        bool side_s, side_t;
         Pose3 Ts_s;
         if (kps_pairs[i](1)<geo_s[0].cols/2)
-            Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_stb[0], tf_stb[1], tf_stb[2]))*cps_pose_s;
+        {
+            side_s = 1;
+            Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_stb[0], tf_stb[1], tf_stb[2]));
+        }
         else
-            Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_port[0], tf_port[1], tf_port[2]))*cps_pose_s;
+        {
+            side_s = 0;
+            Ts_s = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_port[0], tf_port[1], tf_port[2]));
+        }
         Pose3 Ts_t;
         if (kps_pairs[i](4)<geo_t[0].cols/2)
-            Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_stb[0], tf_stb[1], tf_stb[2]))*cps_pose_t;
+        {
+            side_t = 1;
+            Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_stb[0], tf_stb[1], tf_stb[2]));
+        }
         else
-            Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_port[0], tf_port[1], tf_port[2]))*cps_pose_t;
+        {
+            side_t = 0;
+            Ts_t = Pose3(Rot3::Rodrigues(0.0, 0.0, 0.0), Point3(tf_port[0], tf_port[1], tf_port[2]));
+        }
 
         // ping pose  
         Pose3 Tp_s = Pose3(Rot3::Rodrigues(dr_poses_s.at<double>(id_s,0), dr_poses_s.at<double>(id_s,1), dr_poses_s.at<double>(id_s,2)), 
@@ -821,8 +838,8 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
             if (ini_point_dist-final_point_dist>0)
                 sus_rate++;
 
-            cout << "****** LM dists (ini/fnl: norm, sucess rate): " << ini_point_dist << "/" << final_point_dist << " ";
-            cout << (double)sus_rate/kps_pairs.size() << endl;
+            cout << "****** LM dists (ini/fnl: norm, suscess rate, sides): " << ini_point_dist << "/" << final_point_dist << " ";
+            cout << (double)sus_rate/kps_pairs.size() << " (" << side_s << " " << side_t << ")" << endl;
             cout << "****** LM dists (ini/fnl: |x| and |y|): " << abs(x_dist_o) << "/" <<  abs(x_dist_n) << " " ;
             cout << abs(y_dist_o) << "/" <<  abs(y_dist_n) << endl;
             
@@ -1138,8 +1155,8 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &img_id_s
                                 const std::vector<double> &alts_s, const std::vector<double> &alts_t,
                                 const std::vector<Vector6> &kps_pairs_est)
 {
-    bool show_est = 0, show_result = 1, save_result = 0;
-    bool eval_1 = 0, eval_2 = 1;
+    bool show_est = 0, show_result = 1, show_stats = 1, save_result = 0;
+    bool eval_1 = 1, eval_2 = 1;
 
     // -- get all the keypoint pairs --- //
     std::vector<Vector4> kps_pairs;
@@ -1309,9 +1326,15 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &img_id_s
             save_result_3.open(path3.c_str(),ios::trunc);
         }
 
+        int good_count = 0;
+        double x_avg_dr = 0, y_avg_dr = 0, all_avg_dr = 0, x_avg_est = 0, y_avg_est = 0, all_avg_est = 0;
+
+        // --- main loop --- //
         for (size_t i = 0; i < kps_pairs.size(); i++)
         {
-            double x_dist, y_dist;
+            double x_dist_o, y_dist_o, x_dist_n, y_dist_n;
+
+            // --- get index --- //
             int id_s = kps_pairs[i](0), id_t = kps_pairs[i](2);
             if (id_s>=geo_s[0].rows || id_t>=geo_t[0].rows)
                 cout << "row index out of range !!! (in evaluation)" << endl;  
@@ -1320,9 +1343,9 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &img_id_s
                 cout << "column index out of range !!! (in evaluation)" << endl;
 
             // --- initial landmark distance observed between two dr ping poses --- //  
-            x_dist = (geo_s[0].at<double>(id_s,id_ss)-geo_t[0].at<double>(id_t,id_tt));
-            y_dist = (geo_s[1].at<double>(id_s,id_ss)-geo_t[1].at<double>(id_t,id_tt));
-            double ini_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);
+            x_dist_o = (geo_s[0].at<double>(id_s,id_ss)-geo_t[0].at<double>(id_t,id_tt));
+            y_dist_o = (geo_s[1].at<double>(id_s,id_ss)-geo_t[1].at<double>(id_t,id_tt));
+            double ini_point_dist = sqrt(x_dist_o*x_dist_o + y_dist_o*y_dist_o);
 
             // --- final landmark distance observed between two estimated ping poses --- //
             double lm_geo_s_x, lm_geo_s_y, lm_geo_t_x, lm_geo_t_y;
@@ -1354,9 +1377,22 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &img_id_s
                 lm_geo_t_x = new_pose_t.x() + gras_t[gr_idx]*cos(new_pose_t.rotation().yaw()-PI/2-PI);
                 lm_geo_t_y = new_pose_t.y() + gras_t[gr_idx]*sin(new_pose_t.rotation().yaw()-PI/2-PI);
             }
-            x_dist = (lm_geo_s_x-lm_geo_t_x);
-            y_dist = (lm_geo_s_y-lm_geo_t_y);
-            double final_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);   
+            x_dist_n = (lm_geo_s_x-lm_geo_t_x);
+            y_dist_n = (lm_geo_s_y-lm_geo_t_y);
+            double final_point_dist = sqrt(x_dist_n*x_dist_n + y_dist_n*y_dist_n);   
+
+            if (show_stats)
+            {
+                x_avg_dr = x_avg_dr + abs(x_dist_o);
+                y_avg_dr = y_avg_dr + abs(y_dist_o);
+                all_avg_dr = all_avg_dr + abs(ini_point_dist);
+                x_avg_est = x_avg_est + abs(x_dist_n);
+                y_avg_est = y_avg_est + abs(y_dist_n);
+                all_avg_est = all_avg_est + abs(final_point_dist);
+
+                if (ini_point_dist>final_point_dist)
+                    good_count++;
+            }
 
             if (0)
             {
@@ -1371,6 +1407,15 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &img_id_s
                 save_result_3 << ini_point_dist-final_point_dist << endl;       
             }
 
+        }
+
+        if (show_stats)
+        {
+            cout << "Metric Statics: " << (double)good_count/kps_pairs.size()*100 << " ";
+            cout << kps_pairs.size() << " " << img_id_s << " " << img_id_t << endl;
+            cout << "Avg X,Y,NORM (DR/EST): " << x_avg_dr/kps_pairs.size() << "/" << x_avg_est/kps_pairs.size() << " ";
+            cout << y_avg_dr/kps_pairs.size() << "/" << y_avg_est/kps_pairs.size() << " ";
+            cout << all_avg_dr/kps_pairs.size() << "/" << all_avg_est/kps_pairs.size() << endl << endl;
         }
 
         if (save_result)
@@ -1463,7 +1508,7 @@ void Optimizer::EvaluateByAnnosAll(const Values &FinalEstimate, const std::vecto
 {
 
     bool save_result = 1, show_result = 0, show_stats = 1;
-    bool eval_1 = 0, eval_2 = 1;
+    bool eval_1 = 1, eval_2 = 1;
 
     if (eval_2)
     {
@@ -1623,6 +1668,9 @@ void Optimizer::EvaluateByAnnosAll(const Values &FinalEstimate, const std::vecto
         // loop for keypoint pairs in each image pair
         for (size_t i = 0; i < kps_pairs_all.size(); i++)
         {
+            int good_count = 0;
+            double x_avg_dr = 0, y_avg_dr = 0, all_avg_dr = 0, x_avg_est = 0, y_avg_est = 0, all_avg_est = 0;
+
             ofstream save_result_1, save_result_2, save_result_3;
             if (save_result)
             { 
@@ -1687,6 +1735,19 @@ void Optimizer::EvaluateByAnnosAll(const Values &FinalEstimate, const std::vecto
                 double final_point_dist = sqrt(x_dist*x_dist + y_dist*y_dist);
                 double fnl_x_dist = x_dist, fnl_y_dist = y_dist;
 
+                if (show_stats)
+                {
+                    x_avg_dr = x_avg_dr + abs(ini_x_dist);
+                    y_avg_dr = y_avg_dr + abs(ini_y_dist);
+                    all_avg_dr = all_avg_dr + abs(ini_point_dist);
+                    x_avg_est = x_avg_est + abs(fnl_x_dist);
+                    y_avg_est = y_avg_est + abs(fnl_y_dist);
+                    all_avg_est = all_avg_est + abs(final_point_dist);
+
+                    if (ini_point_dist>final_point_dist)
+                        good_count++;
+                }
+                
                 if (save_result)
                 {
                     save_result_1 << ini_point_dist << endl;
@@ -1703,6 +1764,16 @@ void Optimizer::EvaluateByAnnosAll(const Values &FinalEstimate, const std::vecto
 
             }
 
+            if (show_stats)
+            {
+                cout << "LM Metric Statics: " << (double)good_count/kps_pairs_all[i].size()*100 << " ";
+                cout << kps_pairs_all[i].size() << " " << img_pairs_ids[i].first << " " << img_pairs_ids[i].second << endl;
+                cout << "Avg X,Y,NORM (DR/EST): " << x_avg_dr/kps_pairs_all[i].size() << "/" << x_avg_est/kps_pairs_all[i].size() << " ";
+                cout << y_avg_dr/kps_pairs_all[i].size() << "/" << y_avg_est/kps_pairs_all[i].size() << " ";
+                cout << all_avg_dr/kps_pairs_all[i].size() << "/" << all_avg_est/kps_pairs_all[i].size() << endl << endl;
+            }
+            
+
             if (save_result)
             {
                 save_result_1.close();
@@ -1712,8 +1783,6 @@ void Optimizer::EvaluateByAnnosAll(const Values &FinalEstimate, const std::vecto
             
         }
     }
-
-    
 
     return;
 }

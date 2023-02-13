@@ -87,8 +87,8 @@ int main(int argc, char** argv)
 
 
     // --- optimize trajectory between images --- //
-    Optimizer::TrajOptimizationPair(test_frames[0], test_frames[1]);
-    // Optimizer::TrajOptimizationAll(test_frames);
+    // Optimizer::TrajOptimizationPair(test_frames[0], test_frames[1]);
+    Optimizer::TrajOptimizationAll(test_frames);
     
     
 
