@@ -23,7 +23,8 @@ namespace Diasss
         cv::Mat GetNormalizeSSS(const cv::Mat &sss_raw_img);
         cv::Mat GetFilteredMask(const cv::Mat &sss_raw_img);
         void DetectFeature(const cv::Mat &img, const cv::Mat &mask, std::vector<cv::KeyPoint> &kps, cv::Mat &dst);
-        std::vector<cv::Mat> GetGeoImg(const int &row, const int &col, const cv::Mat &pose, const std::vector<double> &g_range);
+        std::vector<cv::Mat> GetGeoImg(const int &row, const int &col, const cv::Mat &pose, const std::vector<double> &g_range,
+                                       const std::vector<double> &tf_stb, const std::vector<double> &tf_port);
 
         // Initialization items
         int img_id;

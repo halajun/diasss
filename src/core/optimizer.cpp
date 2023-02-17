@@ -23,7 +23,7 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
     // weights for use
     double wgt1_ = 0.001, wgt_2 = 20, wgt_3 = 0.5;
     // use annotation or not, add loopclosure or not
-    bool USE_ANNO = 0, ADD_LC = 1;
+    bool USE_ANNO = 1, ADD_LC = 1, SHOW_ID = 0;
     // Noise model paras for pose
     double ro1_ = wgt1_*PI/180, pi1_ = wgt1_*PI/180, ya1_ = wgt1_*wgt_2*PI/180, x1_ = wgt1_*wgt_2, y1_ = wgt1_*wgt_2, z1_ = wgt1_;
     // random noise generator
@@ -222,10 +222,13 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
                         if (id_1>=AllFrames[img_pairs_ids[img_pair_id].first].dr_poses.rows || id_2>=AllFrames[img_pairs_ids[img_pair_id].second].dr_poses.rows)
                             cout << "row index out of range !!! (when add lc constraint in all...)" << endl; 
 
-                        cout << "***********************************************************" << endl;
-                        cout << "Add New Loop Closure Constraint" << " ";
-                        cout << "between X" << unique_id[img_pairs_ids[img_pair_id].first][id_1] << " and X" << unique_id[img_pairs_ids[img_pair_id].second][id_2] << " ";
-                        cout << "(frame " << img_pairs_ids[img_pair_id].first << " and " << img_pairs_ids[img_pair_id].second << ")" << endl;
+                        if (SHOW_ID)
+                        {
+                            cout << "***********************************************************" << endl;
+                            cout << "Add New Loop Closure Constraint" << " ";
+                            cout << "between X" << unique_id[img_pairs_ids[img_pair_id].first][id_1] << " and X" << unique_id[img_pairs_ids[img_pair_id].second][id_2] << " ";
+                            cout << "(frame " << img_pairs_ids[img_pair_id].first << " and " << img_pairs_ids[img_pair_id].second << ")" << endl;
+                        }
 
                         // loop closure uncertainty model
                         auto LoopClosureNoiseModel = gtsam::noiseModel::Diagonal::Variances(get<1>(lc_tf_all[img_pair_id][kps_id]));
@@ -747,7 +750,7 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
             graph.addPrior(Symbol('X', 1), Tp_s, PosePriorModel);  
 
             // add odometry factor to graph      
-            double ro_ = 0.1*PI/180, pi_ = 0.1*PI/180, ya_ = 1.5*PI/180, x_ = abs(Tp_st.x()*2), y_ = abs(Tp_st.y()/10), z_ = 0.5;
+            double ro_ = 0.1*PI/180, pi_ = 0.1*PI/180, ya_ = 1.0*PI/180, x_ = abs(Tp_st.x()*2), y_ = abs(Tp_st.y()/10), z_ = 0.1;
             auto OdometryNoiseModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro_, pi_, ya_), Vector3(x_, y_, z_))
                                                             .finished());
             graph.add(BetweenFactor<Pose3>(Symbol('X',1), Symbol('X',2), Tp_st, OdometryNoiseModel));
@@ -765,6 +768,12 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
             double y_bar = (geo_s[1].at<double>(id_s,id_ss)+geo_t[1].at<double>(id_t,id_tt))/2;
             double z_bar = ( (dr_poses_s.at<double>(id_s,5)-alts_s[id_s]) + (dr_poses_t.at<double>(id_t,5)-alts_t[id_t]) )/2;
             initialEstimate.insert(Symbol('L',1), Point3(x_bar, y_bar, z_bar));
+
+            double depth_uncertainty = sqrt( Tp_st.x()*Tp_st.x() + Tp_st.y()*Tp_st.y() )/100;
+            // cout << "depth uncertainty: " << depth_uncertainty << endl;
+            auto PointPriorModel = noiseModel::Diagonal::Sigmas((Vector(3) << Vector3(10.0, 10.0, depth_uncertainty))
+                                                                    .finished());
+            graph.addPrior(Symbol('L', 1), Point3(x_bar, y_bar, z_bar), PointPriorModel);  
 
             // initialize pose
             initialEstimate.insert(Symbol('X',1), Tp_s);
@@ -838,10 +847,13 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
             if (ini_point_dist-final_point_dist>0)
                 sus_rate++;
 
-            cout << "****** LM dists (ini/fnl: norm, suscess rate, sides): " << ini_point_dist << "/" << final_point_dist << " ";
-            cout << (double)sus_rate/kps_pairs.size() << " (" << side_s << " " << side_t << ")" << endl;
-            cout << "****** LM dists (ini/fnl: |x| and |y|): " << abs(x_dist_o) << "/" <<  abs(x_dist_n) << " " ;
-            cout << abs(y_dist_o) << "/" <<  abs(y_dist_n) << endl;
+            if (printinfo)
+            {
+                cout << "****** LM dists (ini/fnl: norm, suscess rate, sides): " << ini_point_dist << "/" << final_point_dist << " ";
+                cout << (double)sus_rate/kps_pairs.size() << " (" << side_s << " " << side_t << ")" << endl;
+                cout << "****** LM dists (ini/fnl: |x| and |y|): " << abs(x_dist_o) << "/" <<  abs(x_dist_n) << " " ;
+                cout << abs(y_dist_o) << "/" <<  abs(y_dist_n) << endl;
+            }
             
 
             lm_dist_compare = ini_point_dist-final_point_dist;  
@@ -863,11 +875,15 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
             Point3 lm_dr_s = Ts_s.transformTo( Tp_s.transformTo(lm_dr) );
             Point3 lm_dr_t = Ts_t.transformTo( Tp_t.transformTo(lm_dr) );
 
-            cout << "****** initial (using DR poses) range and plane consistency error:" << endl;
-            cout << "source: (" << abs(gtsam::norm3(lm_dr_s)-kps_pairs[i](2)) << " " << abs(lm_dr_s.x())  << "), ";
-            cout << "target: (" << abs(gtsam::norm3(lm_dr_t)-kps_pairs[i](5)) << " " << abs(lm_dr_t.x())  << "), " ;
-            cout << "avg: (" << (abs(gtsam::norm3(lm_dr_s)-kps_pairs[i](2))+abs(gtsam::norm3(lm_dr_t)-kps_pairs[i](5)))/2 << " ";
-            cout << (abs(lm_dr_s.x())+abs(lm_dr_t.x()))/2  << ")" << endl;
+            if (printinfo)
+            {
+                cout << "****** initial (using DR poses) range and plane consistency error:" << endl;
+                cout << "source: (" << abs(gtsam::norm3(lm_dr_s)-kps_pairs[i](2)) << " " << abs(lm_dr_s.x())  << "), ";
+                cout << "target: (" << abs(gtsam::norm3(lm_dr_t)-kps_pairs[i](5)) << " " << abs(lm_dr_t.x())  << "), " ;
+                cout << "avg: (" << (abs(gtsam::norm3(lm_dr_s)-kps_pairs[i](2))+abs(gtsam::norm3(lm_dr_t)-kps_pairs[i](5)))/2 << " ";
+                cout << (abs(lm_dr_s.x())+abs(lm_dr_t.x()))/2  << ")" << endl;
+            }
+
 
             if (save_result)
             {
@@ -881,11 +897,15 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
             Point3 lm_est_s = Ts_s.transformTo( result.at<Pose3>(Symbol('X',1)).transformTo(lm_est) );
             Point3 lm_est_t = Ts_t.transformTo( result.at<Pose3>(Symbol('X',2)).transformTo(lm_est) );
 
-            cout << "****** final (using estimated poses) range and plane consistency error:" << endl; 
-            cout << "source: (" << abs(gtsam::norm3(lm_est_s)-kps_pairs[i](2)) << " " << abs(lm_est_s.x())  << "), ";
-            cout << "target: (" << abs(gtsam::norm3(lm_est_t)-kps_pairs[i](5)) << " " << abs(lm_est_t.x())  << "), ";
-            cout << "avg: (" << (abs(gtsam::norm3(lm_est_s)-kps_pairs[i](2))+abs(gtsam::norm3(lm_est_t)-kps_pairs[i](5)))/2 << " ";
-            cout << (abs(lm_est_s.x())+abs(lm_est_t.x()))/2  << ")" << endl << endl;         
+            if (printinfo)
+            {
+                cout << "****** final (using estimated poses) range and plane consistency error:" << endl; 
+                cout << "source: (" << abs(gtsam::norm3(lm_est_s)-kps_pairs[i](2)) << " " << abs(lm_est_s.x())  << "), ";
+                cout << "target: (" << abs(gtsam::norm3(lm_est_t)-kps_pairs[i](5)) << " " << abs(lm_est_t.x())  << "), ";
+                cout << "avg: (" << (abs(gtsam::norm3(lm_est_s)-kps_pairs[i](2))+abs(gtsam::norm3(lm_est_t)-kps_pairs[i](5)))/2 << " ";
+                cout << (abs(lm_est_s.x())+abs(lm_est_t.x()))/2  << ")" << endl << endl;   
+            }
+      
 
             if (save_result)
             {
@@ -942,6 +962,11 @@ Point3 Optimizer::TriangulateOneLandmark(const Vector6 &kps_pair,
     // add factor to graph
     graph.add(LMTriaFactor(1,Vector2(kps_pair(2),0),Ts_s,Tp_s,KP_NOISE_1));
     graph.add(LMTriaFactor(1,Vector2(kps_pair(5),0),Ts_t,Tp_t,KP_NOISE_2));
+
+    double depth_uncertainty = sqrt( (Tp_s.x()-Tp_t.x())*(Tp_s.x()-Tp_t.x()) + (Tp_s.y()-Tp_t.y())*(Tp_s.y()-Tp_t.y()) )/100;
+    auto PointPriorModel = noiseModel::Diagonal::Sigmas((Vector(3) << Vector3(10.0, 10.0, depth_uncertainty))
+                                                            .finished());
+    graph.addPrior(1, lm_ini, PointPriorModel);  
 
     initialEstimate.insert(1, lm_ini);
 
@@ -1512,6 +1537,19 @@ void Optimizer::EvaluateByAnnosAll(const Values &FinalEstimate, const std::vecto
 
     if (eval_2)
     {
+        ofstream save_result_1_avg, save_result_2_avg, save_result_3_avg, save_result_4_avg;
+        if (save_result)
+        { 
+            string path1_avg = "../result/pr_errors/dr_range_e_avg.txt";
+            save_result_1_avg.open(path1_avg.c_str(),ios::trunc);
+            string path2_avg = "../result/pr_errors/dr_plane_e_avg.txt";
+            save_result_2_avg.open(path2_avg.c_str(),ios::trunc);
+            string path3_avg = "../result/pr_errors/est_range_e_avg.txt";
+            save_result_3_avg.open(path3_avg.c_str(),ios::trunc);
+            string path4_avg = "../result/pr_errors/est_plane_e_avg.txt";
+            save_result_4_avg.open(path4_avg.c_str(),ios::trunc);
+        }  
+
         // loop for keypoint pairs in each image pair
         for (size_t i = 0; i < kps_pairs_all.size(); i++)
         {
@@ -1529,7 +1567,7 @@ void Optimizer::EvaluateByAnnosAll(const Values &FinalEstimate, const std::vecto
                 save_result_3.open(path3.c_str(),ios::trunc);
                 string path4 = "../result/pr_errors/est_plane_e_" + std::to_string(i) + ".txt";
                 save_result_4.open(path4.c_str(),ios::trunc);
-            }
+            }  
 
             // loop for each keypoint pair in current image pair
             for (size_t j = 0; j < kps_pairs_all[i].size(); j++)
@@ -1643,6 +1681,15 @@ void Optimizer::EvaluateByAnnosAll(const Values &FinalEstimate, const std::vecto
                 
             }
 
+            if (save_result)
+            {
+                save_result_1_avg << range_avg_dr/kps_pairs_all[i].size() << endl;
+                save_result_2_avg << plane_avg_dr/kps_pairs_all[i].size() << endl;
+                save_result_3_avg << range_avg_est/kps_pairs_all[i].size() << endl;
+                save_result_4_avg << plane_avg_est/kps_pairs_all[i].size() << endl;
+            }
+            
+
             if (show_stats)
             {
                 cout << "Metric Statics: " << (double)good_count_1/kps_pairs_all[i].size()*100 << " " << (double)good_count_2/kps_pairs_all[i].size()*100 << " ";
@@ -1659,8 +1706,16 @@ void Optimizer::EvaluateByAnnosAll(const Values &FinalEstimate, const std::vecto
                 save_result_4.close();
             }
         
-
         }
+
+        if (save_result)
+        {
+            save_result_1_avg.close();
+            save_result_2_avg.close();
+            save_result_3_avg.close();
+            save_result_4_avg.close();
+        }
+
     }
 
     if (eval_1)

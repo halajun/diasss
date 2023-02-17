@@ -33,9 +33,13 @@ Frame::Frame(const int &id, const cv::Mat &mImg, const cv::Mat &mPose, const std
     // --- (1) body-fixed NED to ENU
     // tf_stb = {-3.119, -0.405, -0.146}; // sensor offset (starboard) ENU
     // tf_port = {-3.119, 0.405, -0.146}; // sensor offset (port) ENU
+    // tf_stb  = {-3.119+1.086, -0.405+0.001, -0.146+0.414}; // sensor offset (starboard) ISO 8855
+    // tf_port = {-3.119+1.086,  0.405+0.001, -0.146+0.414}; // sensor offset (port) ISO 8855
+    tf_stb  = {0, 0, 0};
+    tf_port = {0, 0, 0};
     // --- (2) local NED to ENU
-    tf_stb = {0.405, -3.119, -0.146};   // sensor offset (starboard) ENU
-    tf_port = {-0.405, -3.119, -0.146}; // sensor offset (port) ENU
+    // tf_stb = {0.405, -3.119, -0.146};   // sensor offset (starboard) ENU
+    // tf_port = {-0.405, -3.119, -0.146}; // sensor offset (port) ENU
 
 
     // --- get normalized image --- //
@@ -43,7 +47,7 @@ Frame::Frame(const int &id, const cv::Mat &mImg, const cv::Mat &mPose, const std
     // --- get filtered mask --- //
     flt_mask = GetFilteredMask(mImg);
     // --- get geo-referenced img --- //
-    geo_img = GetGeoImg(mImg.rows,mImg.cols,mPose,vGrange);
+    geo_img = GetGeoImg(mImg.rows,mImg.cols,mPose,vGrange,tf_stb,tf_port);
     // --- detect keypoints and extract descriptors -- //
     DetectFeature(norm_img,flt_mask,kps,dst);
 
@@ -119,7 +123,8 @@ cv::Mat Frame::GetFilteredMask(const cv::Mat &sss_raw_img)
     return output_mask;
 }
 
-std::vector<cv::Mat> Frame::GetGeoImg(const int &row, const int &col, const cv::Mat &pose, const std::vector<double> &g_range)
+std::vector<cv::Mat> Frame::GetGeoImg(const int &row, const int &col, const cv::Mat &pose, const std::vector<double> &g_range,
+                                      const std::vector<double> &tf_stb, const std::vector<double> &tf_port)
 {
     // initialize x y and z
     cv::Mat bin_loc_x = cv::Mat::zeros(row, col, CV_64FC1);
@@ -133,15 +138,15 @@ std::vector<cv::Mat> Frame::GetGeoImg(const int &row, const int &col, const cv::
         // first, fill the starboard side
         for (int j = col/2; j < col; j++)
         {
-            bin_loc_x.at<double>(i,j) = pose.at<double>(i,3) + g_range[count]*cos(pose.at<double>(i,2)+PI/2);
-            bin_loc_y.at<double>(i,j) = pose.at<double>(i,4) + g_range[count]*sin(pose.at<double>(i,2)+PI/2);
+            bin_loc_x.at<double>(i,j) = pose.at<double>(i,3) - tf_stb[0] + g_range[count]*cos(pose.at<double>(i,2)+PI/2);
+            bin_loc_y.at<double>(i,j) = pose.at<double>(i,4) - tf_stb[1] + g_range[count]*sin(pose.at<double>(i,2)+PI/2);
             count++;
         }
         // then the port side
         for (int j = 0; j < col/2; j++)
         {
-            bin_loc_x.at<double>(i,j) = pose.at<double>(i,3) + g_range[count]*cos(pose.at<double>(i,2)-PI/2);
-            bin_loc_y.at<double>(i,j) = pose.at<double>(i,4) + g_range[count]*sin(pose.at<double>(i,2)-PI/2);
+            bin_loc_x.at<double>(i,j) = pose.at<double>(i,3) - tf_port[0] + g_range[count]*cos(pose.at<double>(i,2)-PI/2);
+            bin_loc_y.at<double>(i,j) = pose.at<double>(i,4) - tf_port[1] + g_range[count]*sin(pose.at<double>(i,2)-PI/2);
             count--;
         }
     }
