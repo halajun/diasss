@@ -21,11 +21,11 @@ using namespace gtsam;
 void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
 {
     // weights for use
-    double wgt1_ = 0.001, wgt_2 = 20, wgt_3 = 0.5;
+    double wgt1_ = 0.001, wgt_2 = 10, wgt_3 = 0.5;
     // use annotation or not, add loopclosure or not
-    bool USE_ANNO = 1, ADD_LC = 1, SHOW_ID = 0;
+    bool USE_ANNO = 0, ADD_LC = 1, SHOW_ID = 0;
     // Noise model paras for pose
-    double ro1_ = wgt1_*PI/180, pi1_ = wgt1_*PI/180, ya1_ = wgt1_*wgt_2*PI/180, x1_ = wgt1_*wgt_2, y1_ = wgt1_*wgt_2, z1_ = wgt1_;
+    double ro1_ = wgt1_*PI/180, pi1_ = wgt1_*PI/180, ya1_ = 0.1*wgt1_*wgt_2*PI/180, x1_ = wgt1_*wgt_2, y1_ = wgt1_*wgt_2, z1_ = wgt1_;
     // random noise generator
     std::default_random_engine generator;
     std::normal_distribution<double> distribution(0.0,1.0);
@@ -216,7 +216,8 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
                     }
                     
                     // --- if loop closing measurement found, construct factor and add to graph --- //
-                    if (kps_id!=-1 && get<2>(lc_tf_all[img_pair_id][kps_id])>0)
+                    // if (kps_id!=-1 && get<2>(lc_tf_all[img_pair_id][kps_id])>0)
+                    if (kps_id!=-1 && get<2>(lc_tf_all[img_pair_id][kps_id])>0 && ((img_pairs_ids[img_pair_id].first+img_pairs_ids[img_pair_id].second)%2==0))
                     {
                         int id_1 = kps_pairs_all[img_pair_id][kps_id](0), id_2 = kps_pairs_all[img_pair_id][kps_id](3);
                         if (id_1>=AllFrames[img_pairs_ids[img_pair_id].first].dr_poses.rows || id_2>=AllFrames[img_pairs_ids[img_pair_id].second].dr_poses.rows)
@@ -750,7 +751,7 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
             graph.addPrior(Symbol('X', 1), Tp_s, PosePriorModel);  
 
             // add odometry factor to graph      
-            double ro_ = 0.1*PI/180, pi_ = 0.1*PI/180, ya_ = 1.0*PI/180, x_ = abs(Tp_st.x()*2), y_ = abs(Tp_st.y()/10), z_ = 0.1;
+            double ro_ = 0.1*PI/180, pi_ = 0.1*PI/180, ya_ = 0.5*PI/180, x_ = abs(Tp_st.x()*2), y_ = abs(Tp_st.y()/10), z_ = 0.1;
             auto OdometryNoiseModel = noiseModel::Diagonal::Sigmas((Vector(6) << Vector3(ro_, pi_, ya_), Vector3(x_, y_, z_))
                                                             .finished());
             graph.add(BetweenFactor<Pose3>(Symbol('X',1), Symbol('X',2), Tp_st, OdometryNoiseModel));
@@ -797,7 +798,7 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
         Values result = optimizer.optimize();
 
         // Show results before and after optimization
-        bool printinfo = 1;
+        bool printinfo = 0;
         if (printinfo)
         {
             Pose3 new_pose = result.at<Pose3>(Symbol('X', 2))*cps_pose_t.inverse();
@@ -844,7 +845,7 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
             y_dist_n = (geo_s[1].at<double>(id_s,id_ss)-lm_geo_t_y);          
             double final_point_dist = sqrt(x_dist_n*x_dist_n + y_dist_n*y_dist_n);   
 
-            if (ini_point_dist-final_point_dist>0)
+            if (ini_point_dist/final_point_dist>2)
                 sus_rate++;
 
             if (printinfo)
@@ -856,7 +857,7 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
             }
             
 
-            lm_dist_compare = ini_point_dist-final_point_dist;  
+            lm_dist_compare = ini_point_dist/final_point_dist-2;  
 
             if (save_result)
             {

@@ -55,10 +55,12 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
                                                 const std::vector<cv::KeyPoint> &kps_ref, const cv::Mat &dst_ref, const std::vector<cv::Mat> &geo_img_ref,
                                                 std::vector<std::pair<int,double>> &scc)
 {
-    cv::RNG rng((unsigned)time(NULL));
+    // cv::RNG rng((unsigned)time(NULL));
+    cv::RNG rng;
+    cv::setRNGSeed(1);
     std::vector<int> CorresID = std::vector<int>(kps.size(),-1);
     std::vector<int> ID_loc;
-    bool USE_SIFT = 0, SCC_x = 1, SCC_xy = 0;
+    bool USE_SIFT = 1, SCC_x = 1, SCC_xy = 0;
 
     // --- some parameters --- //
     int radius = 12; // search circle size
@@ -103,9 +105,9 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
         // --- using SIFT --- //
         if (USE_SIFT)
         {
-            double best_dist = 1000, sec_best_dist = 1000, dist_bound = 150;
+            double best_dist = 1000, sec_best_dist = 1000, dist_bound = 350; // 150
             int best_id = -1;
-            double ratio_test = 0.5;
+            double ratio_test = 0.35; // 0.5
             for (size_t j = 0; j < candidate.size(); j++)
             {
                 const double dst_dist = cv::norm(dst.row(i),dst_ref.row(candidate[j]),cv::NORM_L2);
@@ -123,7 +125,7 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
                 
             }
             double fir_sec_ratio = best_dist/sec_best_dist;
-            // cout << "best and second best ratio: " << fir_sec_ratio << endl;
+            // cout << "best and second best ratio: " << fir_sec_ratio  << " " << best_dist << " " << sec_best_dist << endl;
             if (best_id!=-1 && best_dist<dist_bound && fir_sec_ratio<=ratio_test)
             {
                 CorresID[i] = best_id;
@@ -138,11 +140,11 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
         // --- using ORB --- //
         else
         {
-            int best_dist = 1000, sec_best_dist = 1000, dist_bound = 88;
+            int best_dist = 1000, sec_best_dist = 1000, dist_bound = 88; // 88
             if (img_id%2!=img_id_ref%2)
-                dist_bound = 80;            
+                dist_bound = 80; // 80           
             int best_id = -1;
-            double ratio_test = 0.35;
+            double ratio_test = 0.35; // 0.35
             for (size_t j = 0; j < candidate.size(); j++)
             {
                 const int dst_dist = FEAmatcher::DescriptorDistance(dst.row(i),dst_ref.row(candidate[j]));
@@ -160,8 +162,8 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
                 
             }
             double fir_sec_ratio = (double)best_dist/sec_best_dist;
-            // cout << "best and second best ratio: " << fir_sec_ratio << endl;
-            if (best_id!=-1 && best_dist<=dist_bound && fir_sec_ratio<=ratio_test)
+            // cout << "best and second best ratio: " << fir_sec_ratio  << " " << best_dist << " " << sec_best_dist << endl;
+            if (best_id!=-1 && best_dist<=dist_bound && fir_sec_ratio<=ratio_test && sec_best_dist!=1000)
             {
                 CorresID[i] = best_id;
                 ID_loc.push_back(i);
@@ -185,7 +187,7 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
     {
         // cout << "size of first selections: " << ID_loc.size() << endl;
         int final_inlier_num = 0, iter_num = 0, max_iter = 1000, sam_num = 2;
-        double PixError = 2.5;
+        double PixError = 2.5; // 2.5
         std::vector<int> CorresID_final = std::vector<int>(kps.size(),-1);
         while (iter_num<max_iter)
         {
@@ -240,17 +242,17 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
             }
             iter_num = iter_num + 1;
         }
-        // cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+        cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
         CorresID = CorresID_final;
-        // cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+        cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
     }
 
     // --- Sliding Compatibility Check (SCC) on the X  and Y axis of keypoints --- //
     if (SCC_xy)
     {
         // cout << "size of first selections: " << ID_loc.size() << endl;
-        int final_inlier_num = 0, iter_num = 0, max_iter = 1000, sam_num = 2;
-        double PixError_X =3.0, PixError_Y = 3.0;
+        int final_inlier_num = 0, iter_num = 0, max_iter = 1000, sam_num = 3;
+        double PixError_X =3.5, PixError_Y = 15.0; // 3.0, 3.0
         std::vector<int> CorresID_final = std::vector<int>(kps.size(),-1);
         while (iter_num<max_iter)
         {
@@ -307,9 +309,9 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
             }
             iter_num = iter_num + 1;
         }
-        // cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+        cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
         CorresID = CorresID_final;
-        // cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+        cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
     }
     
   

@@ -232,3 +232,8 @@ build/.cmake/api/v1/reply/codemodel-v2-362fdce8c8d9db8c29e0.json
 build/.cmake/api/v1/reply/index-2023-02-17T09-05-34-0681.json
 build/.cmake/api/v1/reply/target-diasss-6eefc27ecf308339fb25.json
 build/.cmake/api/v1/reply/target-test_demo-3189e2d9fb80d4f45a07.json
+test_data/annos-old-xml/SSH-0170.xml
+test_data/annos-old-xml/SSH-0171.xml
+test_data/annos-old-xml/SSH-0172.xml
+test_data/annos-old-xml/SSH-0173.xml
+test_data/annos-old-xml/SSH-0174.xml
