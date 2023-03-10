@@ -194,7 +194,7 @@ void Util::ShowAnnos(int &f1, int &f2, cv::Mat &img1, cv::Mat &img2, const cv::M
     {
         if (use_anno)
         {
-            if (anno1.at<int>(i,1)==f2 && i%10==0)
+            if (anno1.at<int>(i,1)==f2 && i%1==0)
             {
                 PreKeys.push_back(cv::KeyPoint(anno1.at<int>(i,3),anno1.at<int>(i,2),0,0,0,-1));
                 CurKeys.push_back(cv::KeyPoint(anno1.at<int>(i,5),anno1.at<int>(i,4),0,0,0,-1));

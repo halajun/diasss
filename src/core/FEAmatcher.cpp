@@ -63,7 +63,7 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
     bool USE_SIFT = 1, SCC_x = 1, SCC_xy = 0;
 
     // --- some parameters --- //
-    int radius = 12; // search circle size
+    int radius = 8; // search circle size
     int x_min, y_min, x_max, y_max; // rectangle of seach window
     double bx_min, bx_max, by_min, by_max; // geometric border of reference image
 
@@ -252,7 +252,7 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
     {
         // cout << "size of first selections: " << ID_loc.size() << endl;
         int final_inlier_num = 0, iter_num = 0, max_iter = 1000, sam_num = 3;
-        double PixError_X =3.5, PixError_Y = 15.0; // 3.0, 3.0
+        double PixError_X =2.5, PixError_Y = 15.0; // 3.0, 3.0
         std::vector<int> CorresID_final = std::vector<int>(kps.size(),-1);
         while (iter_num<max_iter)
         {
@@ -280,6 +280,7 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
             }
             ModelX = ModelX/sam_num;
             ModelY = ModelY/sam_num;
+            // cout << "MODEL Y: " << ModelY << endl;
             // fit all CorresID to Model, and find inliers
             for (size_t j = 0; j < CorresID.size(); j++)
             {
@@ -293,7 +294,8 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
                     X_tmp= abs(kps[j].pt.y - kps_ref[CorresID[j]].pt.y);
                 Y_tmp= abs(kps[j].pt.x - kps_ref[CorresID[j]].pt.x);
                     
-                // cout << "distance: " << abs(ModelX-X_tmp) << endl;
+                // cout << "X distance: " << abs(ModelX-X_tmp) << endl;
+                // cout << "Y distance: " << abs(ModelY-Y_tmp) << endl;
                 if (abs(ModelX-X_tmp)<=PixError_X && abs(ModelY-Y_tmp)<=PixError_Y)
                 {
                     CorresID_iter[j] = CorresID[j];
@@ -399,11 +401,10 @@ void FEAmatcher::ConsistentCheck(const Frame &SourceFrame, const Frame &TargetFr
                 count = count + 1;    
             }
         }
-               
+            
     }
-    
+
     // // --- cross-check --- //
-    // std::vector<cv::KeyPoint> PreKeys, CurKeys;
     // std::vector<cv::DMatch> TemperalMatches;
     // int count = 0;
     // for (size_t i = 0; i < CorresID_1.size(); i++)
@@ -413,12 +414,14 @@ void FEAmatcher::ConsistentCheck(const Frame &SourceFrame, const Frame &TargetFr
 
     //     if (CorresID_2[CorresID_1[i]]==i)
     //     {
-    //         PreKeys.push_back(kps_1[i]);
-    //         CurKeys.push_back(kps_2[CorresID_1[i]]);
+    //         SourceKeys.push_back(SourceFrame.kps[i]);
+    //         TargetKeys.push_back(TargetFrame.kps[CorresID_1[i]]);
     //         TemperalMatches.push_back(cv::DMatch(count,count,0));
     //         count = count + 1;
     //     }     
     // }
+    
+    cout << "===> cross check number: " << SourceKeys.size() << endl;
 
     // --- demonstrate --- //
     if (show_match)

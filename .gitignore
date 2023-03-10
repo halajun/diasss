@@ -237,3 +237,6 @@ test_data/annos-old-xml/SSH-0171.xml
 test_data/annos-old-xml/SSH-0172.xml
 test_data/annos-old-xml/SSH-0173.xml
 test_data/annos-old-xml/SSH-0174.xml
+detected_kps.txt
+depth_drape.txt
+depth_est_wp.txt

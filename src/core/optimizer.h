@@ -42,23 +42,23 @@ using namespace gtsam;
 
         void static TrajOptimizationAll(std::vector<Frame> &AllFrames);
 
-        std::vector<Vector6> static GetKpsPairs(const bool &USE_ANNO, const cv::Mat &kps, const int &id_s, const int &id_t,
+        std::vector<Vector7> static GetKpsPairs(const bool &USE_ANNO, const cv::Mat &kps, const int &id_s, const int &id_t,
                                          const std::vector<double> &alts_s, const std::vector<double> &gras_s,
                                          const std::vector<double> &alts_t, const std::vector<double> &gras_t);
 
-        std::vector<Point3> static TriangulateLandmarks(const std::vector<Vector6> &kps_pairs, 
+        std::vector<Point3> static TriangulateLandmarks(const std::vector<Vector7> &kps_pairs, 
                                                         const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
                                                         const int &img_id_s, const int &img_id_t,
                                                         const std::vector<cv::Mat> &geo_s, const std::vector<cv::Mat> &geo_t,
                                                         const std::vector<double> &alts_s, const std::vector<double> &alts_t,
                                                         const cv::Mat &dr_poses_s, const cv::Mat &dr_poses_t);
 
-        Point3 static TriangulateOneLandmark(const Vector6 &kps_pair, 
+        Point3 static TriangulateOneLandmark(const Vector7 &kps_pair, 
                                              const Pose3 &Ts_s, const Pose3 &Ts_t,
                                              const Pose3 &Tp_s, const Pose3 &Tp_t,
                                              const Point3 &lm_ini);
 
-        std::vector<tuple<Pose3,Vector6,double>> static LoopClosingTFs(const std::vector<Vector6> &kps_pairs, 
+        std::vector<tuple<Pose3,Vector6,double>> static LoopClosingTFs(const std::vector<Vector7> &kps_pairs, 
                                                         const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
                                                         const int &img_id_s, const int &img_id_t,
                                                         const std::vector<cv::Mat> &geo_s, const std::vector<cv::Mat> &geo_t,
@@ -81,12 +81,12 @@ using namespace gtsam;
                                     const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
                                     const cv::Mat &dr_poses_s, const cv::Mat &dr_poses_t,
                                     const std::vector<double> &alts_s, const std::vector<double> &alts_t,
-                                    const std::vector<Vector6> &kps_pairs_est);
+                                    const std::vector<Vector7> &kps_pairs_est);
 
         void static EvaluateByAnnosAll(const Values &FinalEstimate, const std::vector<std::vector<int>> &unique_id,
                                        const std::vector<std::vector<cv::Mat>> &geo_img_all,
                                        const std::vector<std::vector<double>> &gras_all,
-                                       const std::vector<std::vector<Vector6>> &kps_pairs_all,
+                                       const std::vector<std::vector<Vector7>> &kps_pairs_all,
                                        const std::vector<pair<int,int>> &img_pairs_ids,
                                        const std::vector<cv::Mat> &dr_poses_all,
                                        const std::vector<double> &tf_stb, const std::vector<double> &tf_port,

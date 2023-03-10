@@ -23,7 +23,7 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
     // weights for use
     double wgt1_ = 0.001, wgt_2 = 10, wgt_3 = 0.5;
     // use annotation or not, add loopclosure or not
-    bool USE_ANNO = 0, ADD_LC = 1, SHOW_ID = 0;
+    bool USE_ANNO = 1, ADD_LC = 1, SHOW_ID = 0;
     // Noise model paras for pose
     double ro1_ = wgt1_*PI/180, pi1_ = wgt1_*PI/180, ya1_ = 0.1*wgt1_*wgt_2*PI/180, x1_ = wgt1_*wgt_2, y1_ = wgt1_*wgt_2, z1_ = wgt1_;
     // random noise generator
@@ -32,13 +32,13 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
     double noise_xyz = wgt_3, noise_rpy = wgt_3*PI/180;
 
     // --- get all the keypoint pairs (all images) --- //
-    std::vector<std::vector<Vector6>> kps_pairs_all;
+    std::vector<std::vector<Vector7>> kps_pairs_all;
     std::vector<pair<int,int>> img_pairs_ids;
     for (size_t i = 0; i < AllFrames.size(); i++)
     {
         for (size_t j = i+1; j < AllFrames.size(); j++)
         {
-            std::vector<Vector6> kps_pairs;
+            std::vector<Vector7> kps_pairs;
             if (USE_ANNO)
             {
                 kps_pairs = Optimizer::GetKpsPairs(USE_ANNO,AllFrames[i].anno_kps,AllFrames[i].img_id,AllFrames[j].img_id,
@@ -59,6 +59,10 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
         
     }
 
+    ofstream save_result_det_kps;
+    string path="../detected_kps.txt";
+    save_result_det_kps.open(path.c_str(),ios::trunc);
+
     // --- get all the loop closing measurements --- //
     std::vector<std::vector<tuple<Pose3,Vector6,double>>> lc_tf_all;
     int idx = 0;
@@ -69,6 +73,15 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
             cout << "***********************************************************************" << endl;
             cout << "Compute lc tfs between frame " << AllFrames[i].img_id << " and " << AllFrames[j].img_id << " ";
             cout << "( "  << kps_pairs_all[idx].size() << " in total...)" << endl;
+
+            // save detected keypoints
+            for (size_t k=0; k<kps_pairs_all[idx].size();k++)
+            {
+                save_result_det_kps << fixed << setprecision(9) << AllFrames[i].img_id << " " << AllFrames[j].img_id << " "  <<  kps_pairs_all[idx][k](0) << " " << kps_pairs_all[idx][k](1) << " "
+                                << kps_pairs_all[idx][k](2)  << " " << kps_pairs_all[idx][k](3) << " "
+                                << kps_pairs_all[idx][k](4) << " " << kps_pairs_all[idx][k](5) << endl;
+            }
+
             vector<tuple<Pose3,Vector6,double>> lc_tf_Conv = Optimizer::LoopClosingTFs(kps_pairs_all[idx], 
                                                                             AllFrames[i].tf_stb, AllFrames[i].tf_port,
                                                                             AllFrames[i].img_id, AllFrames[j].img_id, 
@@ -82,6 +95,8 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
         }
 
     }
+
+    save_result_det_kps.close();
 
     // --- assign unique ID for each pose ---//  
     int id_sum = 0;  
@@ -279,12 +294,12 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
         gras_all.push_back(AllFrames[i].ground_ranges);
         alts_all.push_back(AllFrames[i].altitudes);
     }
-    std::vector<std::vector<Vector6>> anno_kps_pairs_all;
+    std::vector<std::vector<Vector7>> anno_kps_pairs_all;
     for (size_t i = 0; i < AllFrames.size(); i++)
     {
         for (size_t j = i+1; j < AllFrames.size(); j++)
         {
-            std::vector<Vector6> kps_pairs;
+            std::vector<Vector7> kps_pairs;
             kps_pairs = Optimizer::GetKpsPairs(true,AllFrames[i].anno_kps,AllFrames[i].img_id,AllFrames[j].img_id,
                                                AllFrames[i].altitudes,AllFrames[i].ground_ranges,
                                                AllFrames[j].altitudes,AllFrames[j].ground_ranges);
@@ -303,7 +318,7 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
 
 void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
 {
-    bool USE_ANNO = 0, SHOW_IMG = 0, ADD_LC = 1; // use annotation or not, show image or not, add loopclosure or not
+    bool USE_ANNO = 0, SHOW_IMG = 1, ADD_LC = 1; // use annotation or not, show image or not, add loopclosure or not
     if (SHOW_IMG)
         Util::ShowAnnos(SourceFrame.img_id,TargetFrame.img_id,SourceFrame.norm_img,TargetFrame.norm_img,
                         SourceFrame.anno_kps,TargetFrame.anno_kps);
@@ -318,7 +333,7 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
     std::normal_distribution<double> distribution(0.0,1.0);
     double noise_xyz = 5, noise_rpy = 5*PI/180;
 
-    std::vector<Vector6> kps_pairs;
+    std::vector<Vector7> kps_pairs;
     if (USE_ANNO)
     {
         kps_pairs = Optimizer::GetKpsPairs(USE_ANNO,SourceFrame.anno_kps,SourceFrame.img_id,TargetFrame.img_id,
@@ -557,12 +572,12 @@ void Optimizer::TrajOptimizationPair(Frame &SourceFrame, Frame &TargetFrame)
 
 }
 
-std::vector<Vector6> Optimizer::GetKpsPairs(const bool &USE_ANNO, const cv::Mat &kps, const int &id_s, const int &id_t,
+std::vector<Vector7> Optimizer::GetKpsPairs(const bool &USE_ANNO, const cv::Mat &kps, const int &id_s, const int &id_t,
                                      const std::vector<double> &alts_s, const std::vector<double> &gras_s,
                                      const std::vector<double> &alts_t, const std::vector<double> &gras_t)
 {
 
-    std::vector<Vector6> kps_pairs;
+    std::vector<Vector7> kps_pairs;
 
     int step_size = 1;
     for (size_t i = 0; i < kps.rows; i=i+step_size)
@@ -602,8 +617,12 @@ std::vector<Vector6> Optimizer::GetKpsPairs(const bool &USE_ANNO, const cv::Mat 
             double slant_range_s = sqrt(alts_s[kp_s[0]]*alts_s[kp_s[0]] + gras_s[abs(gra_id_s)]*gras_s[abs(gra_id_s)]);
             int gra_id_t = kp_t[1]- gras_t.size();
             double slant_range_t = sqrt(alts_t[kp_t[0]]*alts_t[kp_t[0]] + gras_t[abs(gra_id_t)]*gras_t[abs(gra_id_t)]);
+            double drap_depth = 0;
+            if (USE_ANNO)
+                drap_depth = double(kps.at<int>(i,6)) / 100000.0;  
+            // cout << "drapping depth ---> " <<  drap_depth << " " << kps.at<int>(i,6) << endl;             
 
-            Vector6 kp_pair = (gtsam::Vector6() << kp_s[0], kp_s[1], slant_range_s, kp_t[0], kp_t[1], slant_range_t).finished();
+            Vector7 kp_pair = (gtsam::Vector7() << kp_s[0], kp_s[1], slant_range_s, kp_t[0], kp_t[1], slant_range_t, drap_depth).finished();
 
             // for (size_t i = 0; i < kp_pair.size(); i++)
             //     cout << kp_pair(i) << " ";
@@ -619,7 +638,7 @@ std::vector<Vector6> Optimizer::GetKpsPairs(const bool &USE_ANNO, const cv::Mat 
                                             
 }
 
-std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::vector<Vector6> &kps_pairs, 
+std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::vector<Vector7> &kps_pairs, 
                                                 const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
                                                 const int &img_id_s, const int &img_id_t,
                                                 const std::vector<cv::Mat> &geo_s, const std::vector<cv::Mat> &geo_t,
@@ -631,6 +650,7 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
     Pose3 cps_pose_s = gtsam::Pose3::identity(), cps_pose_t = gtsam::Pose3::identity();
 
     ofstream save_result_1, save_result_2, save_r_1, save_p_1, save_r_2, save_p_2;
+    ofstream save_d_1, save_d_2;
     if (save_result)
     {
         string path1 = "../ini_lm_errors.txt";
@@ -645,6 +665,10 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
         save_r_2.open(path5.c_str(),ios::trunc);
         string path6 = "../est_plane_e.txt";
         save_p_2.open(path6.c_str(),ios::trunc);
+        string path7 = "../depth_est_wp.txt";
+        save_d_1.open(path7.c_str(),ios::trunc);
+        string path8 = "../depth_drape.txt";
+        save_d_2.open(path8.c_str(),ios::trunc);
     }
         
 
@@ -770,11 +794,11 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
             double z_bar = ( (dr_poses_s.at<double>(id_s,5)-alts_s[id_s]) + (dr_poses_t.at<double>(id_t,5)-alts_t[id_t]) )/2;
             initialEstimate.insert(Symbol('L',1), Point3(x_bar, y_bar, z_bar));
 
-            double depth_uncertainty = sqrt( Tp_st.x()*Tp_st.x() + Tp_st.y()*Tp_st.y() )/100;
-            // cout << "depth uncertainty: " << depth_uncertainty << endl;
-            auto PointPriorModel = noiseModel::Diagonal::Sigmas((Vector(3) << Vector3(10.0, 10.0, depth_uncertainty))
-                                                                    .finished());
-            graph.addPrior(Symbol('L', 1), Point3(x_bar, y_bar, z_bar), PointPriorModel);  
+            // double depth_uncertainty = sqrt( Tp_st.x()*Tp_st.x() + Tp_st.y()*Tp_st.y() )/25; // 100
+            // // cout << "depth uncertainty: " << depth_uncertainty << endl;
+            // auto PointPriorModel = noiseModel::Diagonal::Sigmas((Vector(3) << Vector3(10.0, 10.0, depth_uncertainty))
+            //                                                         .finished());
+            // graph.addPrior(Symbol('L', 1), Point3(x_bar, y_bar, z_bar), PointPriorModel);  
 
             // initialize pose
             initialEstimate.insert(Symbol('X',1), Tp_s);
@@ -796,6 +820,18 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
         // parameters.maxIterations = 100;
         // GaussNewtonOptimizer optimizer(graph, initialEstimate, parameters);
         Values result = optimizer.optimize();
+
+        // cout << "LM Position ini/est: " << endl;
+        // cout << initialEstimate.at<Point3>(Symbol('L', 1)).x() << " " << initialEstimate.at<Point3>(Symbol('L', 1)).y() << " " << initialEstimate.at<Point3>(Symbol('L', 1)).z() << endl;
+        // cout << result.at<Point3>(Symbol('L', 1)).x() << " "<< result.at<Point3>(Symbol('L', 1)).y() << " " << result.at<Point3>(Symbol('L', 1)).z()<< endl;
+
+        // cout << "Depth Estimation(ini/dra/est): " << initialEstimate.at<Point3>(Symbol('L', 1)).z() << " " ;
+        // cout << kps_pairs[i](6) << " " << result.at<Point3>(Symbol('L', 1)).z() << endl;
+        if (save_result)
+        {
+            save_d_1 << result.at<Point3>(Symbol('L', 1)).z() << endl;
+            save_d_2 << kps_pairs[i](6) << endl;            
+        }
 
         // Show results before and after optimization
         bool printinfo = 0;
@@ -936,6 +972,8 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
         save_p_1.close();
         save_r_2.close();
         save_p_2.close();
+        save_d_1.close();
+        save_d_2.close();
     }
     
     
@@ -943,7 +981,7 @@ std::vector<tuple<Pose3,Vector6,double>>  Optimizer::LoopClosingTFs(const std::v
 
 }
 
-Point3 Optimizer::TriangulateOneLandmark(const Vector6 &kps_pair, 
+Point3 Optimizer::TriangulateOneLandmark(const Vector7 &kps_pair, 
                                          const Pose3 &Ts_s, const Pose3 &Ts_t,
                                          const Pose3 &Tp_s, const Pose3 &Tp_t,
                                          const Point3 &lm_ini)
@@ -983,7 +1021,7 @@ Point3 Optimizer::TriangulateOneLandmark(const Vector6 &kps_pair,
 }
 
 
-vector<Point3> Optimizer::TriangulateLandmarks(const std::vector<Vector6> &kps_pairs, 
+vector<Point3> Optimizer::TriangulateLandmarks(const std::vector<Vector7> &kps_pairs, 
                                                const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
                                                const int &img_id_s, const int &img_id_t,
                                                const std::vector<cv::Mat> &geo_s, const std::vector<cv::Mat> &geo_t,
@@ -1179,14 +1217,14 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &img_id_s
                                 const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
                                 const cv::Mat &dr_poses_s, const cv::Mat &dr_poses_t,
                                 const std::vector<double> &alts_s, const std::vector<double> &alts_t,
-                                const std::vector<Vector6> &kps_pairs_est)
+                                const std::vector<Vector7> &kps_pairs_est)
 {
     bool show_est = 0, show_result = 1, show_stats = 1, save_result = 0;
     bool eval_1 = 1, eval_2 = 1;
 
     // -- get all the keypoint pairs --- //
     std::vector<Vector4> kps_pairs;
-    std::vector<Vector6> kps_pairs_anno;
+    std::vector<Vector7> kps_pairs_anno;
     std::vector<bool> close_to_est(anno_kps_s.rows,false);
     int close_thres = 15;
     for (size_t i = 0; i < anno_kps_s.rows; i++)
@@ -1213,8 +1251,8 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &img_id_s
             double slant_range_s = sqrt(alts_s[kp_s[0]]*alts_s[kp_s[0]] + gras_s[abs(gra_id_s)]*gras_s[abs(gra_id_s)]);
             int gra_id_t = kp_t[1]- gras_t.size();
             double slant_range_t = sqrt(alts_t[kp_t[0]]*alts_t[kp_t[0]] + gras_t[abs(gra_id_t)]*gras_t[abs(gra_id_t)]);
-
-            Vector6 kp_pair_anno = (gtsam::Vector6() << kp_s[0], kp_s[1], slant_range_s, kp_t[0], kp_t[1], slant_range_t).finished();
+            double drap_depth = (double)anno_kps_s.at<int>(i,6)/10000.0;
+            Vector7 kp_pair_anno = (gtsam::Vector7() << kp_s[0], kp_s[1], slant_range_s, kp_t[0], kp_t[1], slant_range_t, drap_depth).finished();
             kps_pairs_anno.push_back(kp_pair_anno);
 
             Vector4 kp_pair = (gtsam::Vector4() << kp_s[0], kp_s[1], kp_t[0], kp_t[1]).finished();
@@ -1526,7 +1564,7 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &img_id_s
 void Optimizer::EvaluateByAnnosAll(const Values &FinalEstimate, const std::vector<std::vector<int>> &unique_id,
                                     const std::vector<std::vector<cv::Mat>> &geo_img_all,
                                     const std::vector<std::vector<double>> &gras_all,
-                                    const std::vector<std::vector<Vector6>> &kps_pairs_all,
+                                    const std::vector<std::vector<Vector7>> &kps_pairs_all,
                                     const std::vector<pair<int,int>> &img_pairs_ids,
                                     const std::vector<cv::Mat> &dr_poses_all,
                                     const std::vector<double> &tf_stb, const std::vector<double> &tf_port,
