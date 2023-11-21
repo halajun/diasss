@@ -80,11 +80,23 @@ int main(int argc, char** argv)
     for (size_t i = 0; i < test_num; i++)
         test_frames.push_back(Frame(i,vmImgs[i],vmPoses[i],vvAltts[i],vvGranges[i],vmAnnos[i]));
 
+    // --- get initial flow from geo-referenced image
+    
+
     // --- find correspondences between each pair of frames --- //
     for (size_t i = 0; i < test_frames.size(); i++)
         for (size_t j = i+1; j < test_frames.size(); j++)
+          {
             FEAmatcher::RobustMatching(test_frames[i],test_frames[j]);
-
+            // if (i==3 && j==i+1)
+            // {
+            //   imwrite("img-173.jpg", test_frames[i].norm_img);
+            //   cv::Mat src2;
+            //   // flip(test_frames[j].norm_img, src2,-1);
+            //   imwrite("img-174.jpg", test_frames[j].norm_img);              
+            // }
+            
+          }
 
     // --- optimize trajectory between images --- //
     // Optimizer::TrajOptimizationPair(test_frames[0], test_frames[2]);

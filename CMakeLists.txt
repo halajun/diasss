@@ -33,10 +33,10 @@ set(diasss_SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/util/util.cpp
   ${PROJECT_SOURCE_DIR}/src/core/frame.cpp
   ${PROJECT_SOURCE_DIR}/src/core/FEAmatcher.cpp
-  ${PROJECT_SOURCE_DIR}/thirdparty/ORBextractor.cpp
   ${PROJECT_SOURCE_DIR}/src/core/optimizer.cpp
   ${PROJECT_SOURCE_DIR}/src/core/LMtriangulatefactor.cpp
   ${PROJECT_SOURCE_DIR}/src/core/SSSpointfactor.cpp
+  ${PROJECT_SOURCE_DIR}/thirdparty/ORBextractor.cpp
 )
 
 add_library(diasss ${diasss_SOURCE_FILES})

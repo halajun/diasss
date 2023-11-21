@@ -60,7 +60,7 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
     }
 
     ofstream save_result_det_kps;
-    string path="../detected_kps.txt";
+    string path="../annotated_kps.txt";
     save_result_det_kps.open(path.c_str(),ios::trunc);
 
     // --- get all the loop closing measurements --- //
@@ -1178,9 +1178,11 @@ void Optimizer::SaveTrajactoryAll(const Values &FinalEstimate, const std::vector
             Pose3 save_pose = Pose3(
                     Rot3::Rodrigues(dr_poses_all[i].at<double>(j,0),dr_poses_all[i].at<double>(j,1),dr_poses_all[i].at<double>(j,2)), 
                     Point3(dr_poses_all[i].at<double>(j,3), dr_poses_all[i].at<double>(j,4), dr_poses_all[i].at<double>(j,5)));
-            save_result_1 << fixed << setprecision(9) << save_pose.rotation().quaternion()(1) << " " << save_pose.rotation().quaternion()(2) << " "
-                        << save_pose.rotation().quaternion()(3) << " " << save_pose.rotation().quaternion()(0) << " " << save_pose.x() << " " 
-                        << save_pose.y() << " " << save_pose.z() << endl;
+            save_result_1 << fixed << setprecision(9) << save_pose.rotation().rpy()(0) << " " << save_pose.rotation().rpy()(1) << " "
+                        << save_pose.rotation().rpy()(2) << " " << save_pose.x() << " " << save_pose.y() << " " << save_pose.z() << endl;
+            // save_result_1 << fixed << setprecision(9) << save_pose.rotation().quaternion()(1) << " " << save_pose.rotation().quaternion()(2) << " "
+            //             << save_pose.rotation().quaternion()(3) << " " << save_pose.rotation().quaternion()(0) << " " << save_pose.x() << " " 
+            //             << save_pose.y() << " " << save_pose.z() << endl;
         }
     }
 
@@ -1197,9 +1199,11 @@ void Optimizer::SaveTrajactoryAll(const Values &FinalEstimate, const std::vector
         for (size_t j = 0; j < unique_id[i].size(); j++)
         {
             Pose3 save_pose = FinalEstimate.at<Pose3>(Symbol('X',unique_id[i][j]));
-            save_result_2 << fixed << setprecision(9) << save_pose.rotation().quaternion()(1) << " " << save_pose.rotation().quaternion()(2) << " "
-                        << save_pose.rotation().quaternion()(3) << " " << save_pose.rotation().quaternion()(0) << " " << save_pose.x() << " " 
-                        << save_pose.y() << " " << save_pose.z() << endl;
+            save_result_2 << fixed << setprecision(9) << save_pose.rotation().rpy()(0) << " " << save_pose.rotation().rpy()(1) << " "
+                        << save_pose.rotation().rpy()(2) << " " << save_pose.x() << " " << save_pose.y() << " " << save_pose.z() << endl;
+            // save_result_2 << fixed << setprecision(9) << save_pose.rotation().quaternion()(1) << " " << save_pose.rotation().quaternion()(2) << " "
+            //             << save_pose.rotation().quaternion()(3) << " " << save_pose.rotation().quaternion()(0) << " " << save_pose.x() << " " 
+            //             << save_pose.y() << " " << save_pose.z() << endl;
             
         }
     }
