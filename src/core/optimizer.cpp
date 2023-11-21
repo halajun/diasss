@@ -23,7 +23,7 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
     // weights for use
     double wgt1_ = 0.001, wgt_2 = 10, wgt_3 = 0.5;
     // use annotation or not, add loopclosure or not
-    bool USE_ANNO = 1, ADD_LC = 1, SHOW_ID = 0;
+    bool USE_ANNO = 1, ADD_LC = 1, SHOW_ID = 1;
     // Noise model paras for pose
     double ro1_ = wgt1_*PI/180, pi1_ = wgt1_*PI/180, ya1_ = 0.1*wgt1_*wgt_2*PI/180, x1_ = wgt1_*wgt_2, y1_ = wgt1_*wgt_2, z1_ = wgt1_;
     // random noise generator
@@ -231,8 +231,8 @@ void Optimizer::TrajOptimizationAll(std::vector<Frame> &AllFrames)
                     }
                     
                     // --- if loop closing measurement found, construct factor and add to graph --- //
-                    // if (kps_id!=-1 && get<2>(lc_tf_all[img_pair_id][kps_id])>0)
-                    if (kps_id!=-1 && get<2>(lc_tf_all[img_pair_id][kps_id])>0 && ((img_pairs_ids[img_pair_id].first+img_pairs_ids[img_pair_id].second)%2==0))
+                    if (kps_id!=-1 && get<2>(lc_tf_all[img_pair_id][kps_id])>0)
+                    // if (kps_id!=-1 && get<2>(lc_tf_all[img_pair_id][kps_id])>0 && ((img_pairs_ids[img_pair_id].first+img_pairs_ids[img_pair_id].second)%2==0))
                     {
                         int id_1 = kps_pairs_all[img_pair_id][kps_id](0), id_2 = kps_pairs_all[img_pair_id][kps_id](3);
                         if (id_1>=AllFrames[img_pairs_ids[img_pair_id].first].dr_poses.rows || id_2>=AllFrames[img_pairs_ids[img_pair_id].second].dr_poses.rows)
@@ -1224,7 +1224,7 @@ void Optimizer::EvaluateByAnnos(const Values &FinalEstimate, const int &img_id_s
                                 const std::vector<Vector7> &kps_pairs_est)
 {
     bool show_est = 0, show_result = 1, show_stats = 1, save_result = 0;
-    bool eval_1 = 1, eval_2 = 1;
+    bool eval_1 = 0, eval_2 = 0;
 
     // -- get all the keypoint pairs --- //
     std::vector<Vector4> kps_pairs;
@@ -1576,7 +1576,7 @@ void Optimizer::EvaluateByAnnosAll(const Values &FinalEstimate, const std::vecto
 {
 
     bool save_result = 1, show_result = 0, show_stats = 1;
-    bool eval_1 = 1, eval_2 = 1;
+    bool eval_1 = 0, eval_2 = 0;
 
     if (eval_2)
     {

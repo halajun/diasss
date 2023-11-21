@@ -82,8 +82,6 @@ int main(int argc, char** argv)
     std::vector<Frame> test_frames;
     for (size_t i = 0; i < test_num; i++)
         test_frames.push_back(Frame(i,vmImgs[i],vmPoses[i],vvAltts[i],vvGranges[i],vmAnnos[i]));
-
-    // --- get initial flow from geo-referenced image
     
 
     // --- find correspondences between each pair of frames --- //
@@ -101,9 +99,6 @@ int main(int argc, char** argv)
     // --- optimize trajectory between images --- //
     // Optimizer::TrajOptimizationPair(test_frames[0], test_frames[2]);
     Optimizer::TrajOptimizationAll(test_frames);
-    
-    
-
 
 
     return 0;

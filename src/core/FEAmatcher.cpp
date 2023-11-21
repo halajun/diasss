@@ -242,9 +242,9 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
             }
             iter_num = iter_num + 1;
         }
-        cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+        // cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
         CorresID = CorresID_final;
-        cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+        // cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
     }
 
     // --- Sliding Compatibility Check (SCC) on the X  and Y axis of keypoints --- //
@@ -311,9 +311,9 @@ std::vector<int> FEAmatcher::GeoNearNeighSearch(const int &img_id, const int &im
             }
             iter_num = iter_num + 1;
         }
-        cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+        // cout << "initial inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
         CorresID = CorresID_final;
-        cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
+        // cout << "final inlier number: " << CorresID.size()-std::count(CorresID.begin(), CorresID.end(), -1) << endl;
     }
     
   
@@ -421,7 +421,7 @@ void FEAmatcher::ConsistentCheck(const Frame &SourceFrame, const Frame &TargetFr
     //     }     
     // }
     
-    cout << "===> cross check number: " << SourceKeys.size() << endl;
+    // cout << "===> cross check number: " << SourceKeys.size() << endl;
 
     // --- demonstrate --- //
     if (show_match)
