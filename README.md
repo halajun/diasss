@@ -6,7 +6,7 @@ This repository presents a feature-based SLAM framework using side-scan sonar, w
 
 This code is released under a [GPLv3 license](https://github.com/halajun/diasss/blob/main/LICENSE).
 
-If you use this code in an academic work, please cite:
+If you use this code in an academic work, please cite the following paper ([link](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/rsn2.12500)):
 
     @article{zhang2023rsn,
     title={A fully-automatic side-scan sonar simultaneous localization and mapping framework},
@@ -67,7 +67,7 @@ The command to run the executable file is:
 ../bin/./test_demo --image ../test_data/img-xml/ --pose ../test_data/pose-xml/ --altitude ../test_data/altitude/ --groundrange ../test_data/groundrange/ --annotation ../test_data/annos-xml/
 ```
 Here:
-1. --image: the canonical transformed (or normal, should also work) side-scan image is saved in xml file of OpenCV (using the function cv::FileStorage()), in the size of NxM;
+1. --image: the canonical transformed (or normal, should also work) side-scan image is saved in xml file of OpenCV (using the function cv::FileStorage()), in the size of NxM, where N is the number of pings, and M is the number of bins;
 2. --pose: the initial pose (dead-reckoning) is also saved in xml file, in size of Nx6 (roll,pitch,yaw,x,y,z).
 3. --altitude： the altitude of AUV is saved in txt， in the size of Nx1；
 4. --groundrange: the ground range of side-scan image is also saved in txt, in the size of (M/2)x1;
@@ -75,7 +75,7 @@ Here:
 
 # 5. Canonical Representation for Side-scan Image
 
-The details of cannonical transformation for side-scan image can be found in [SSS Canonical Representation](https://github.com/luxiya01/SSS-Canonical-Representation). If you use the code of canonical transformation in an academic work, please cite:
+The details of cannonical transformation for side-scan image can be found in [SSS Canonical Representation](https://github.com/luxiya01/SSS-Canonical-Representation). If you use the code of canonical transformation in an academic work, please cite the following paper ([link](https://arxiv.org/abs/2304.09243)):
 
     @INPROCEEDINGS{xu2023oceans,
     author={Xu, Weiqi and Ling, Li and Xie, Yiping and Zhang, Jun and Folkesson, John},
