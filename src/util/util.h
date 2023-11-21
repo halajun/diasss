@@ -4,6 +4,7 @@
 
 #include<iostream>
 #include <boost/filesystem.hpp>
+#include <algorithm>
 
 #include <Eigen/Dense>
 #include <Eigen/Core>
@@ -20,6 +21,8 @@ namespace Diasss
     class Util
     {
     public:
+
+        static float ComputeIntersection(const std::vector<cv::Mat> &geo_img_s, const std::vector<cv::Mat> &geo_img_t);
 
         static void LoadInputData(const std::string &strImageFolder, const std::string &strPoseFolder, const std::string &strAltitudeFolder, const std::string &strGroundRangeFolder, const std::string &strAnnotationFolder,
                          std::vector<cv::Mat> &vmImgs, std::vector<cv::Mat> &vmPoses, std::vector<std::vector<double>> &vvAltts, std::vector<std::vector<double>> &vvGranges, std::vector<cv::Mat> &vmAnnos);

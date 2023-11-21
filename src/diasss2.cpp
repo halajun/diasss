@@ -24,6 +24,9 @@ using namespace Diasss;
 
 int main(int argc, char** argv)
 {
+
+    float MIN_OVERLAP = 0.4; // minimum overlap percentage of two frames;
+
     std::string strImageFolder, strPoseFolder, strAltitudeFolder, strGroundRangeFolder, strAnnotationFolder;
 
     // --- read input data paths --- //
@@ -87,15 +90,12 @@ int main(int argc, char** argv)
     for (size_t i = 0; i < test_frames.size(); i++)
         for (size_t j = i+1; j < test_frames.size(); j++)
           {
-            FEAmatcher::RobustMatching(test_frames[i],test_frames[j]);
-            // if (i==3 && j==i+1)
-            // {
-            //   imwrite("img-173.jpg", test_frames[i].norm_img);
-            //   cv::Mat src2;
-            //   // flip(test_frames[j].norm_img, src2,-1);
-            //   imwrite("img-174.jpg", test_frames[j].norm_img);              
-            // }
-            
+            float overlap_percentage = Util::ComputeIntersection(test_frames[i].geo_img, test_frames[j].geo_img);
+            cout << "The OVERLAPPING RATE Between image " << i << " and " << j << " : " << overlap_percentage << " ..."<< endl;
+            if (overlap_percentage>MIN_OVERLAP)
+            {
+                FEAmatcher::RobustMatching(test_frames[i],test_frames[j]);
+            }            
           }
 
     // --- optimize trajectory between images --- //

@@ -10,6 +10,38 @@ using namespace cv;
 
 #define PI 3.14159265359
 
+float Util::ComputeIntersection(const std::vector<cv::Mat> &geo_img_s, const std::vector<cv::Mat> &geo_img_t)
+{
+    float output = 0.0;
+
+    double sx_min, sy_min, sx_max, sy_max; // geometric border of source image
+    double tx_min, tx_max, ty_min, ty_max; // geometric border of target image
+
+    // get boundary of the source geo-image
+    cv::minMaxLoc(geo_img_s[0], &sx_min, &sx_max);
+    cv::minMaxLoc(geo_img_s[1], &sy_min, &sy_max);
+
+    // get boundary of the target geo-image
+    cv::minMaxLoc(geo_img_t[0], &tx_min, &tx_max);
+    cv::minMaxLoc(geo_img_t[1], &ty_min, &ty_max);
+
+    float x_dist_ol = std::min(sx_max, tx_max) - std::max(sx_min,tx_min);
+    float y_dist_ol = std::min(ty_max, sy_max) - std::max(sy_min,ty_min);
+
+    if (x_dist_ol>0 && y_dist_ol>0)
+    {
+        float area_ol = x_dist_ol*y_dist_ol;
+        float area_s = std::abs(sx_max-sx_min)*std::abs(sy_max-sy_min);
+        float area_t = std::abs(tx_max-tx_min)*std::abs(ty_max-ty_min);
+        output = area_ol/(area_s+area_t-area_ol);
+    }
+    
+
+
+    return output;
+
+}
+
 void Util::LoadInputData(const std::string &strImageFolder, const std::string &strPoseFolder, const std::string &strAltitudeFolder, const std::string &strGroundRangeFolder, const std::string &strAnnotationFolder,
                          std::vector<cv::Mat> &vmImgs, std::vector<cv::Mat> &vmPoses, std::vector<std::vector<double>> &vvAltts, std::vector<std::vector<double>> &vvGranges, std::vector<cv::Mat> &vmAnnos)
 {
