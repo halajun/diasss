@@ -8,12 +8,15 @@ This code is released under a [GPLv3 license](https://github.com/halajun/diasss/
 
 If you use this code in an academic work, please cite the following paper ([link](https://ietresearch.onlinelibrary.wiley.com/doi/full/10.1049/rsn2.12500)):
 
-    @article{zhang2023rsn,
-    title={A fully-automatic side-scan sonar simultaneous localization and mapping framework},
-    author={Zhang, Jun and Xie, Yiping and Ling, Li and Folkesson, John},
-    journal={IET Radar, Sonar \& Navigation},
-    year={2023},
-    publisher={Wiley Online Library}
+    @article{zhang2024fully,
+      title={A fully-automatic side-scan sonar simultaneous localization and mapping framework},
+      author={Zhang, Jun and Xie, Yiping and Ling, Li and Folkesson, John},
+      journal={IET Radar, Sonar \& Navigation},
+      volume={18},
+      number={5},
+      pages={674--683},
+      year={2024},
+      publisher={Wiley Online Library}
     }
 
 # 2. Prerequisites
